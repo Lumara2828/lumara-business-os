@@ -80,3 +80,10 @@ um limite por utilizadora (`IA_LIMITE_PEDIDOS_HORA`).
   Restaurar: `pg_restore --clean --if-exists -d "$DATABASE_URL" ficheiro.dump`.
 - **Publicação**: backend como serviço Docker (`backend/Dockerfile`, corre as migrações ao arrancar); frontend como
   site estático (`npm run build` → `dist/`, com `VITE_API_URL` apontado para a API e regra de reescrita `/* → /index.html`).
+
+## Publicação (um só serviço)
+O `Dockerfile` na raiz compila o site e serve-o junto com a API (`backend/app/servidor.py`):
+o site fica em `/` e a API em `/api`, no mesmo endereço. Variáveis no serviço:
+`DATABASE_URL` (aceita `postgres://…` tal como o Render a fornece), `SECRET_KEY`, `CORS_ORIGENS`
+(o próprio endereço) e, só para demonstração, `SEED_DEMO=1` (carrega os dados DEMO no arranque;
+retirar antes de uso real e correr `python -m scripts.seed_demo --limpar`).

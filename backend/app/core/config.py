@@ -3,6 +3,7 @@
 Nenhum segredo tem valor por omissão: SECRET_KEY é obrigatório para a
 aplicação arrancar, para nunca correr em produção com um valor de exemplo.
 """
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,6 +34,15 @@ class Settings(BaseSettings):
     ia_modelo: str = "claude-opus-5-5"          # alternativas mais económicas: claude-sonnet-5-5, claude-haiku-5-5
     ia_esforco: str = "medium"                  # low | medium | high
     ia_limite_pedidos_hora: int = 30            # por utilizadora, para controlo de custos
+
+    @field_validator("database_url")
+    @classmethod
+    def _driver(cls, v: str) -> str:
+        """Aceita a URL tal como o Render/Supabase a dão (postgres:// ou postgresql://)."""
+        for prefixo in ("postgres://", "postgresql://"):
+            if v.startswith(prefixo):
+                return "postgresql+psycopg://" + v[len(prefixo):]
+        return v
 
     @property
     def lista_cors(self) -> list[str]:
