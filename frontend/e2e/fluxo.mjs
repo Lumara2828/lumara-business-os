@@ -109,6 +109,47 @@ await luisa.click("button[aria-label^='Notificações']");
 await luisa.waitForSelector("text=E2E: óleo de rícino");
 await foto(luisa, "13-notificacoes");
 
+// --- Fase 2: produção e stock ---
+await diana.goto(`${BASE}/producao`);
+await diana.waitForSelector("text=Ordens de produção");
+await foto(diana, "14-producao");
+await diana.click("text=Óleo fortalecedor de unhas 30 ml >> nth=0");
+await diana.waitForSelector("role=dialog >> text=Materiais necessários");
+await diana.click("role=dialog >> button:has-text('Iniciar')");
+await diana.waitForSelector("role=dialog >> text=Em curso");
+await diana.click("role=dialog >> button:has-text('Concluir e registar lote')");
+await diana.fill("#op-prod", "19");
+await diana.click("role=dialog >> button:has-text('Confirmar conclusão')");
+await diana.waitForSelector("role=dialog >> text=Rastreabilidade do lote");
+await diana.click("role=dialog >> button:has-text('Rastreabilidade do lote')");
+await diana.waitForSelector("text=Origem: OP-");
+await foto(diana, "15-rastreabilidade");
+await diana.keyboard.press("Escape");
+await diana.keyboard.press("Escape");
+await diana.goto(`${BASE}/stock`);
+await diana.waitForSelector("text=Stock e inventário");
+assert.equal(await diana.locator("th:has-text('Valor')").count(), 0, "Diana não vê valores do stock");
+await diana.click("role=tab[name='Relatórios']");
+await diana.waitForSelector("text=a comprar");
+assert.equal(await diana.locator("text=Valor do inventário").count(), 0);
+await foto(diana, "16-stock-relatorios");
+await diana.click("text=+ Entrada");
+await diana.selectOption("#mv-artigo", { label: await diana.locator("#mv-artigo option", { hasText: "Frasco âmbar" }).textContent() });
+await diana.fill("#mv-qtd", "100");
+await diana.click("role=dialog >> button:has-text('Registar')");
+await diana.waitForSelector("text=Entrada registada");
+
+await luisa.goto(`${BASE}/stock`);
+await luisa.click("role=tab[name='Relatórios']");
+await luisa.waitForSelector("text=Valor do inventário");
+await luisa.goto(`${BASE}/`);
+await luisa.waitForSelector("text=Estado da produção");
+await foto(luisa, "17-painel-ceo-fase2");
+
+await maira.goto(`${BASE}/stock`);
+await maira.waitForSelector("text=Stock e inventário");
+assert.equal(await maira.locator("button:has-text('+ Entrada')").count(), 0, "Maira só consulta o stock");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

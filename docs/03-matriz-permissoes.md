@@ -26,12 +26,18 @@ Fonte de verdade: `backend/app/core/permissions.py` (testada em `tests/test_perm
 | Gerir equipa (contas, funções, palavras-passe) | ● | | |
 | Registo de actividade (auditoria) | ● | | |
 | Configuração (metas, limites de alerta, categorias) | ● | | |
+| **Fase 2 — Produção e Stock** | | | |
+| Consultar stock, lotes, fichas e ordens (quantidades) | ● | ● | ● |
+| Criar/editar artigos e fornecedores | ● | | ● |
+| Entradas, saídas, perdas, inventário físico | ● | | ● |
+| Fichas técnicas (criar, nova versão) | ● | | ● |
+| Ordens de produção (criar para si, iniciar, concluir, cancelar) | ● | | ● |
+| Atribuir ordens a outra pessoa | ● | | |
+| Registar e resolver não conformidades | ● | | ● |
+| **Custos unitários, custo de produção, valor do inventário** | ● | ✖ | ✖ |
 | **Fases seguintes (já declaradas)** | | | |
 | Calendário editorial | ● | ● | |
 | Aprovar publicação de conteúdos | ● | | |
-| Ordens de produção, fichas técnicas | ● | | ● |
-| Movimentos de stock | ● | | ● |
-| Ver valor financeiro do inventário | ● | | |
 | Vendas e clientes (CRM) | ● | ● | |
 | **Dados financeiros confidenciais** | ● | ✖ | ✖ |
 | Aprovar despesas, alterar preços | ● | ✖ | ✖ |

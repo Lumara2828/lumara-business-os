@@ -48,3 +48,35 @@ export interface EstadoActual { pendentes: number; em_atraso: number; aguardar_a
   criticas_abertas: number; para_hoje: number; proximos_7_dias: number; em_andamento: number }
 export interface ResumoExecutivo { nivel: "bom" | "atencao" | "critico" | "neutro"; como_esta: string; corre_bem: string[];
   atrasado: string[]; perdas: { nota: string; itens: string[] }; intervencao_ceo: string[]; prioridades: string[] }
+
+// --- Fase 2: stock e produção ---
+export type CategoriaArtigo = "materia_prima" | "embalagem" | "produto_acabado";
+export interface Artigo { id: string; codigo: string; nome: string; categoria: CategoriaArtigo; unidade: string;
+  stock_minimo: string; disponivel: string; abaixo_minimo: boolean; ruptura: boolean; fornecedor: { id: string; nome: string } | null;
+  controla_lotes: boolean; descricao: string | null; activo: boolean; is_demo: boolean; ultima_entrada: string | null;
+  ultima_saida: string | null; custo_unitario: string | null; valor_stock: string | null; lotes?: Lote[] }
+export interface Lote { id: string; numero: string; artigo: { id: string; codigo: string; nome: string; unidade: string; categoria: string };
+  data_producao: string; validade: string | null; estado_validade: string; expirado: boolean; ordem_producao_id: string | null;
+  lote_fornecedor: string | null; saldo: string | null; is_demo: boolean }
+export interface Movimento { id: number; tipo: string; tipo_rotulo: string; quantidade: string;
+  artigo: { id: string; codigo: string; nome: string; unidade: string }; lote: { id: string; numero: string } | null;
+  data_movimento: string; motivo: string | null; referencia: string | null; ordem_producao_id: string | null; utilizador: string;
+  criado_em: string; is_demo: boolean; custo_unitario: string | null }
+export interface Fornecedor { id: string; nome: string; contacto: string | null; telefone: string | null; email: string | null;
+  notas: string | null; activo: boolean; is_demo: boolean }
+export interface Ficha { id: string; codigo: string; versao: number; nome: string; produto: { id: string; codigo: string; nome: string; unidade: string };
+  rendimento: string; tempo_producao_min: number | null; validade_dias: number | null; instrucoes: string | null;
+  requisitos_qualidade: string | null; activa: boolean; is_demo: boolean; ordens_concluidas: number;
+  ingredientes: { artigo: { id: string; codigo: string; nome: string; unidade: string; categoria: string }; quantidade: string; custo_unitario: string | null }[];
+  custo_estimado_unidade: string | null; ingredientes_sem_custo: string[] }
+export interface Ordem { id: string; numero: number; codigo: string; estado: "planeada" | "em_curso" | "concluida" | "cancelada";
+  estado_rotulo: string; ficha: { id: string; codigo: string; versao: number; nome: string };
+  produto: { id: string; nome: string; unidade: string }; quantidade_planeada: string; quantidade_produzida: string | null;
+  rendimento_pct: string | null; responsavel: { id: string; nome: string }; data_inicio: string; data_prevista: string;
+  iniciada_em: string | null; concluida_em: string | null; atrasada: boolean; lote: { id: string; numero: string; validade: string | null } | null;
+  notas: string | null; motivo_cancelamento: string | null; tarefa_id: string | null; is_demo: boolean; custo_materiais: string | null;
+  pode_operar: boolean; faltas?: { artigo: string; falta: string; unidade: string }[];
+  necessidades?: { artigo: string; unidade: string; necessario: string; disponivel: string; falta: string }[];
+  movimentos?: Movimento[]; nao_conformidades?: NaoConformidade[] }
+export interface NaoConformidade { id: string; ordem_id: string | null; lote_id: string | null; descricao: string; gravidade: Prioridade;
+  accao_correctiva: string | null; estado: string; reportada_por: string; criada_em: string; resolvida_em: string | null }

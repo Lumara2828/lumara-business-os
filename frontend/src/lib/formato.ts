@@ -101,3 +101,15 @@ export const AREAS: Record<string, string> = {
 export const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 export const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro",
   "Novembro", "Dezembro"];
+
+export const CATEGORIAS_ARTIGO: Record<string, string> = {
+  materia_prima: "Matéria-prima", embalagem: "Embalagem / material", produto_acabado: "Produto acabado",
+};
+export const UNIDADES: Record<string, string> = { g: "g", kg: "kg", ml: "ml", l: "L", un: "un." };
+
+/** Quantidade "1234.500" → "1 234,5". */
+export function fQtd(v: string | number | null | undefined, unidade?: string): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const s = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 3 }).format(Number(v));
+  return unidade ? `${s} ${UNIDADES[unidade] ?? unidade}` : s;
+}

@@ -14,10 +14,10 @@ notificações, registo de actividade, configuração), nunca por cópia de dado
 ┌──────────────────────────────────────────▼─────────────────────────────────────────────────────┐
 │ API FastAPI (Python 3.12+)                                                                     │
 │  ├─ core: configuração, sessões, RBAC, erros, auditoria, fuso Africa/Luanda                   │
-│  ├─ módulos Fase 1: auth · equipa · tarefas · notificações · ocorrências · responsabilidades  │
-│  │                   rotina (relatório semanal) · dashboard/excepções · auditoria · configuração│
+│  ├─ Fase 1: auth · equipa · tarefas · notificações · ocorrências · responsabilidades · rotina  │
+│  │          dashboard/excepções · auditoria · configuração · Fase 2: stock · produção     │
 │  ├─ automação: verificação idempotente de alertas (pedido, botão da CEO ou cron)              │
-│  └─ (futuro) produção · stock · marketing · vendas · finanças · eventos · procedimentos · IA  │
+│  └─ (futuro) marketing · vendas · finanças · eventos · procedimentos · IA                    │
 └──────────────────────────────────────────┬─────────────────────────────────────────────────────┘
                                            │ SQLAlchemy 2 · migrações Alembic
 ┌──────────────────────────────────────────▼─────────────────────────────────────────────────────┐
@@ -126,4 +126,4 @@ flowchart LR
 ```
 
 Legenda: setas contínuas = fluxo de dados implementado ou planeado com regra de negócio; tracejado = referência/sugestão.
-Activo na Fase 1: Núcleo, Tarefas, Dashboard (operacional), Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal.
+Activo: Fase 1 (Núcleo, Tarefas, Dashboard, Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal) e Fase 2 (Produção, Stock e Inventário).

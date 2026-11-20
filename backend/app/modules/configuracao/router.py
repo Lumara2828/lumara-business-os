@@ -15,6 +15,7 @@ LIMITES = {
     "meta_cumprimento_prazos": (0, 100),
     "dias_atraso_alerta_ceo": (0, 30),
     "dias_aprovacao_pendente": (0, 30),
+    "dias_alerta_validade": (1, 365),
     "dia_planeamento": (0, 6),
     "dia_revisao": (0, 6),
 }

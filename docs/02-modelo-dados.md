@@ -40,7 +40,22 @@ erDiagram
 | `registos_actividade` | utilizador_id, accao, entidade, entidade_id, resumo, alteracoes (JSONB antes/depois), ip | **trigger impede UPDATE/DELETE** |
 | `configuracoes` | chave, valor (JSONB) | — |
 
-## Fases 2–6 — modelo previsto (não implementado)
+## Fase 2 — implementado (migração `0002`)
+
+| Tabela | Campos principais | Regras na base de dados |
+|---|---|---|
+| `fornecedores` | nome, contacto, telefone, email, notas, activo | nome único |
+| `artigos` | codigo, nome, categoria (`materia_prima`/`embalagem`/`produto_acabado`), unidade (g, kg, ml, l, un), stock_minimo, custo_unitario (médio ponderado), fornecedor_id, controla_lotes | código único; produto acabado ⇒ controla lotes |
+| `lotes` | artigo_id, numero, data_producao, validade, ordem_producao_id, fornecedor_id, lote_fornecedor | (artigo, número) único; validade ≥ produção |
+| `movimentos_stock` | artigo_id, lote_id, tipo (`entrada`/`saida`/`consumo`/`producao`/`perda`/`ajustamento`/`inventario`), quantidade (com sinal), custo_unitario, data_movimento, motivo, referencia, ordem_producao_id, utilizador_id | **trigger impede UPDATE/DELETE**; sinal coerente com o tipo; perdas e ajustes exigem motivo |
+| `fichas_tecnicas` | codigo, versao, produto_id, nome, rendimento, tempo_producao_min, validade_dias, instrucoes, requisitos_qualidade, activa | (código, versão) único |
+| `ficha_ingredientes` | ficha_id, artigo_id, quantidade (por receita), ordem | quantidade > 0 |
+| `ordens_producao` | numero (OP-0001), ficha_id, produto_id, quantidade_planeada/produzida, responsavel_id, datas, estado (`planeada`/`em_curso`/`concluida`/`cancelada`), lote_id, custo_materiais, tarefa_id | concluída ⇒ data e quantidade |
+| `nao_conformidades` | ordem_id, lote_id, descricao, gravidade, accao_correctiva, estado, ocorrencia_id | origem obrigatória |
+
+Stock disponível = soma dos movimentos (por artigo e por lote); nunca é uma coluna editável.
+
+## Fases 3–6 — modelo previsto (não implementado)
 
 ```mermaid
 erDiagram

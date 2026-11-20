@@ -10,8 +10,10 @@ import Login from "./pages/Login";
 import Notificacoes from "./pages/Notificacoes";
 import Ocorrencias from "./pages/Ocorrencias";
 import Painel from "./pages/Painel";
+import Producao from "./pages/Producao";
 import Responsabilidades from "./pages/Responsabilidades";
 import Rotina from "./pages/Rotina";
+import Stock from "./pages/Stock";
 import Tarefas from "./pages/Tarefas";
 
 function Protegida({ permissao, children }: { permissao: string; children: React.ReactNode }) {
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="tarefas" element={<Tarefas />} />
         <Route path="excepcoes" element={<Protegida permissao="excepcoes.ver"><Excepcoes /></Protegida>} />
         <Route path="rotina" element={<Protegida permissao="relatorios.equipa"><Rotina /></Protegida>} />
+        <Route path="producao" element={<Protegida permissao="stock.ver"><Producao /></Protegida>} />
+        <Route path="stock" element={<Protegida permissao="stock.ver"><Stock /></Protegida>} />
         <Route path="ocorrencias" element={<Ocorrencias />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />
         <Route path="notificacoes" element={<Notificacoes />} />

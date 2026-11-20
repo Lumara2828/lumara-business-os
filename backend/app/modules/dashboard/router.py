@@ -14,6 +14,8 @@ from app.modules.configuracao import service as config
 from app.modules.dashboard import metricas
 from app.modules.dashboard.resumo import resumo_executivo
 from app.modules.ocorrencias.models import Ocorrencia
+from app.modules.producao import service as producao_svc
+from app.modules.stock import service as stock_svc
 from app.modules.ocorrencias.router import ROTULO_TIPO
 from app.modules.tarefas import service as tarefas
 from app.modules.tarefas.models import Tarefa
@@ -25,8 +27,8 @@ MODULOS = [
     {"modulo": "Gestão de Tarefas e Equipa", "fase": 1, "estado": "activo"},
     {"modulo": "Dashboard Executivo (operacional)", "fase": 1, "estado": "activo"},
     {"modulo": "Central de Excepções", "fase": 1, "estado": "activo"},
-    {"modulo": "Produção", "fase": 2, "estado": "planeado"},
-    {"modulo": "Stock e Inventário", "fase": 2, "estado": "planeado"},
+    {"modulo": "Produção", "fase": 2, "estado": "activo"},
+    {"modulo": "Stock e Inventário", "fase": 2, "estado": "activo"},
     {"modulo": "Marketing e Conteúdos com IA", "fase": 3, "estado": "planeado"},
     {"modulo": "Eventos e Campanhas", "fase": 3, "estado": "planeado"},
     {"modulo": "Vendas e Clientes", "fase": 4, "estado": "planeado"},
@@ -59,8 +61,24 @@ def executivo(
         "ocorrencias_abertas": metricas.ocorrencias_abertas(db),
         "proximos_prazos": [tarefas.para_saida(ctx, t) for t in proximas],
         "resumo": resumo_executivo(db),
+        "stock": _stock_resumo(db),
+        "producao": producao_svc.estado_producao(db),
         "modulos": MODULOS,
         "gerado_em": agora(),
+    }
+
+
+def _stock_resumo(db: Session) -> dict:
+    abaixo = stock_svc.abaixo_minimo(db)
+    dias = int(config.obter(db, "dias_alerta_validade"))
+    validade = stock_svc.proximos_validade(db, dias)
+    return {
+        "abaixo_minimo": [{"id": str(a.id), "nome": a.nome, "categoria": a.categoria, "unidade": a.unidade,
+                           "disponivel": str(q), "stock_minimo": str(a.stock_minimo), "ruptura": q <= 0} for a, q in abaixo[:10]],
+        "total_abaixo_minimo": len(abaixo),
+        "rupturas": sum(1 for _, q in abaixo if q <= 0),
+        "lotes_validade_proxima": len(validade),
+        "lotes_expirados": sum(1 for l, _ in validade if l.validade < hoje()),
     }
 
 
@@ -79,6 +97,7 @@ def pessoal(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_
         "esta_semana": [tarefas.para_saida(ctx, t) for t in minhas if d < t.prazo <= d + timedelta(days=6)],
         "bloqueadas": [tarefas.para_saida(ctx, t) for t in minhas if t.estado == "bloqueada"],
         "aguardar_aprovacao": [tarefas.para_saida(ctx, t) for t in minhas if t.estado == "aguardar_aprovacao"],
+        "stock": _stock_resumo(db) if ctx.pode(P.STOCK_MOVIMENTAR) else None,
     }
 
 
@@ -121,6 +140,12 @@ def excepcoes(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = De
         "atrasos": [saida(t) for t in atraso_relevante],
         "problemas_producao": occ({"problema_producao"}),
         "rupturas_stock": occ({"necessidade_material"}),
+        "stock_critico": [{"id": str(a.id), "nome": a.nome, "unidade": a.unidade, "disponivel": str(q),
+                           "stock_minimo": str(a.stock_minimo), "ruptura": q <= 0}
+                          for a, q in stock_svc.abaixo_minimo(db) if q <= 0 or a.categoria == "produto_acabado"],
+        "lotes_expirados": [{"id": str(l.id), "numero": l.numero, "artigo": l.artigo.nome, "validade": l.validade,
+                             "saldo": str(q), "unidade": l.artigo.unidade}
+                            for l, q in stock_svc.proximos_validade(db, 0) if l.validade < d],
         "reclamacoes": occ({"reclamacao_cliente"}),
         "despesas_fora_orcamento": occ({"despesa_imprevista"}),
         "encomendas_problematicas": occ({"encomenda_problematica"}),

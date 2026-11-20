@@ -39,13 +39,15 @@ class P(StrEnum):
     EQUIPA_GERIR = "equipa.gerir"
     AUDITORIA_VER = "auditoria.ver"
     CONFIGURACAO_GERIR = "configuracao.gerir"
+    # --- Fase 2: produção e stock ---
+    PRODUCAO_ORDENS = "producao.ordens"
+    PRODUCAO_FICHAS_TECNICAS = "producao.fichas_tecnicas"
+    STOCK_VER = "stock.ver"                      # consultar quantidades (sem valores)
+    STOCK_MOVIMENTAR = "stock.movimentar"
+    STOCK_VER_VALOR = "stock.ver_valor"          # custos e valor do inventário (confidencial)
     # --- Fases seguintes (declaradas, sem endpoints ainda) ---
     MARKETING_CALENDARIO = "marketing.calendario"
     MARKETING_APROVAR = "marketing.aprovar_publicacao"
-    PRODUCAO_ORDENS = "producao.ordens"
-    PRODUCAO_FICHAS_TECNICAS = "producao.fichas_tecnicas"
-    STOCK_MOVIMENTAR = "stock.movimentar"
-    STOCK_VER_VALOR = "stock.ver_valor"
     VENDAS_GERIR = "vendas.gerir"
     FINANCAS_VER = "financas.ver"
     FINANCAS_APROVAR_DESPESAS = "financas.aprovar_despesas"
@@ -60,6 +62,7 @@ _COMUNS = {
     P.OCORRENCIAS_REGISTAR,
     P.RESPONSABILIDADES_VER,
     P.PROCEDIMENTOS_VER,
+    P.STOCK_VER,
 }
 
 MATRIZ: dict[Funcao, frozenset[P]] = {

@@ -7,7 +7,7 @@ Uso: python -m scripts.seed_demo
 import argparse
 from datetime import datetime, time, timedelta, timezone
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
 
 import app.models  # noqa: F401
 from app.core.database import SessionLocal
@@ -34,6 +34,19 @@ def quando(d, h=15):
 
 def limpar(db):
     demo_ids = list(db.scalars(select(Utilizador.id).where(Utilizador.is_demo.is_(True))))
+    # Movimentos de stock são imutáveis; remover os DEMO é uma operação administrativa explícita
+    # (o trigger é suspenso só dentro desta transacção e reactivado no fim).
+    db.execute(text("ALTER TABLE movimentos_stock DISABLE TRIGGER movimentos_stock_imutavel"))
+    db.execute(text("UPDATE ordens_producao SET lote_id = NULL, tarefa_id = NULL WHERE is_demo"))
+    db.execute(text("DELETE FROM nao_conformidades WHERE ordem_id IN (SELECT id FROM ordens_producao WHERE is_demo)"))
+    db.execute(text("DELETE FROM movimentos_stock WHERE artigo_id IN (SELECT id FROM artigos WHERE is_demo)"))
+    db.execute(text("ALTER TABLE movimentos_stock ENABLE TRIGGER movimentos_stock_imutavel"))
+    db.execute(text("DELETE FROM lotes WHERE artigo_id IN (SELECT id FROM artigos WHERE is_demo)"))
+    db.execute(text("DELETE FROM ordens_producao WHERE is_demo"))
+    db.execute(text("DELETE FROM ficha_ingredientes WHERE ficha_id IN (SELECT id FROM fichas_tecnicas WHERE is_demo)"))
+    db.execute(text("DELETE FROM fichas_tecnicas WHERE is_demo"))
+    db.execute(text("DELETE FROM artigos WHERE is_demo"))
+    db.execute(text("DELETE FROM fornecedores WHERE is_demo"))
     db.execute(delete(Ocorrencia).where(Ocorrencia.is_demo.is_(True)))
     db.execute(delete(Tarefa).where(Tarefa.is_demo.is_(True)))
     db.execute(delete(ActividadeRecorrente).where(ActividadeRecorrente.is_demo.is_(True)))
@@ -155,10 +168,76 @@ def semear(db):
     db.flush()
     t = db.scalar(select(Tarefa).where(Tarefa.titulo.like("[DEMO] Guião%")))
     db.add(ComentarioTarefa(tarefa_id=t.id, autor_id=mai, tipo="submissao", texto="Guião pronto, segue em anexo para revisão."))
+    db.flush()
+    semear_producao(db, u["producao"], u["ceo"])
     db.commit()
     print("Dados DEMO criados.")
     for nome, email, funcao, _ in USERS:
         print(f"  {nome:14} {email:24} palavra-passe: {PASSWORD_DEMO}")
+
+
+def semear_producao(db, diana, luisa):
+    """Fase 2 — artigos, lotes, ficha técnica e ordens DEMO. Sem custos: os custos
+    reais são introduzidos pela CEO (não se inventam dados financeiros)."""
+    from decimal import Decimal as D
+    from app.dependencies import Contexto
+    from app.modules.producao import service as prod
+    from app.modules.producao.models import FichaIngrediente, FichaTecnica, OrdemProducao
+    from app.modules.stock import service as stock
+    from app.modules.stock.models import Artigo, Fornecedor
+
+    ctx = Contexto(utilizador=diana, sessao=None, ip=None)
+    d = hoje()
+    forn = Fornecedor(nome="[DEMO] Fornecedor de óleos vegetais", is_demo=True)
+    forn2 = Fornecedor(nome="[DEMO] Fornecedor de embalagens", is_demo=True)
+    db.add_all([forn, forn2])
+    db.flush()
+    art = {}
+    for cod, nome, cat, un, minimo, f, lotes in [
+        ("MP-COCO", "Óleo de coco virgem", "materia_prima", "ml", 2000, forn, True),
+        ("MP-RICINO", "Óleo de rícino", "materia_prima", "ml", 1000, forn, True),
+        ("MP-KARITE", "Manteiga de karité", "materia_prima", "g", 1000, forn, True),
+        ("MP-ESS-LAV", "Óleo essencial de lavanda", "materia_prima", "ml", 50, forn, True),
+        ("EMB-FR30", "Frasco âmbar 30 ml com conta-gotas", "embalagem", "un", 50, forn2, False),
+        ("EMB-ROT", "Rótulo Lumara", "embalagem", "un", 100, forn2, False),
+        ("PA-UNHAS30", "Óleo fortalecedor de unhas 30 ml", "produto_acabado", "un", 20, None, True),
+        ("PA-CORPO100", "Óleo corporal 100 ml", "produto_acabado", "un", 15, None, True),
+    ]:
+        a = Artigo(codigo=f"DEMO-{cod}", nome=f"[DEMO] {nome}", categoria=cat, unidade=un, stock_minimo=D(minimo),
+                   fornecedor_id=f.id if f else None, controla_lotes=lotes, is_demo=True)
+        db.add(a)
+        art[cod] = a
+    db.flush()
+    E = stock.DadosEntrada
+    stock.registar_entrada(db, ctx, art["MP-COCO"].id, E(D(5000), validade=d + timedelta(days=300), data_movimento=d - timedelta(days=20)), is_demo=True)
+    stock.registar_entrada(db, ctx, art["MP-RICINO"].id, E(D(800), validade=d + timedelta(days=25), data_movimento=d - timedelta(days=40)), is_demo=True)
+    stock.registar_entrada(db, ctx, art["MP-KARITE"].id, E(D(3000), validade=d + timedelta(days=200), data_movimento=d - timedelta(days=15)), is_demo=True)
+    stock.registar_entrada(db, ctx, art["MP-ESS-LAV"].id, E(D(200), validade=d + timedelta(days=400), data_movimento=d - timedelta(days=30)), is_demo=True)
+    stock.registar_entrada(db, ctx, art["EMB-FR30"].id, E(D(60), data_movimento=d - timedelta(days=30)), is_demo=True)
+    stock.registar_entrada(db, ctx, art["EMB-ROT"].id, E(D(500), data_movimento=d - timedelta(days=30)), is_demo=True)
+
+    ficha = FichaTecnica(codigo="DEMO-FT-UNHAS30", versao=1, produto_id=art["PA-UNHAS30"].id,
+                         nome="[DEMO] Óleo fortalecedor de unhas 30 ml", rendimento=D(10), tempo_producao_min=90, validade_dias=365,
+                         instrucoes="1. Higienizar bancada e utensílios.\n2. Pesar os óleos.\n3. Misturar e juntar o óleo essencial.\n"
+                                    "4. Envasar, fechar e rotular.\n5. Registar lote e validade.",
+                         requisitos_qualidade="Aspecto límpido, sem partículas; frasco bem vedado; rótulo com lote e validade.",
+                         is_demo=True)
+    ficha.ingredientes = [FichaIngrediente(artigo_id=art["MP-RICINO"].id, quantidade=D(150), ordem=0),
+                          FichaIngrediente(artigo_id=art["MP-COCO"].id, quantidade=D(140), ordem=1),
+                          FichaIngrediente(artigo_id=art["MP-ESS-LAV"].id, quantidade=D(10), ordem=2),
+                          FichaIngrediente(artigo_id=art["EMB-FR30"].id, quantidade=D(10), ordem=3),
+                          FichaIngrediente(artigo_id=art["EMB-ROT"].id, quantidade=D(10), ordem=4)]
+    db.add(ficha)
+    db.flush()
+    feita = OrdemProducao(ficha_id=ficha.id, produto_id=ficha.produto_id, quantidade_planeada=D(30), responsavel_id=diana.id,
+                          data_inicio=d - timedelta(days=6), data_prevista=d - timedelta(days=5), criado_por_id=luisa.id, is_demo=True)
+    db.add(feita)
+    db.flush()
+    db.refresh(feita)
+    prod.concluir(db, ctx, feita, D(28), numero_lote=None, validade=None, notas="Duas unidades com vedação defeituosa.")
+    db.add(OrdemProducao(ficha_id=ficha.id, produto_id=ficha.produto_id, quantidade_planeada=D(20), responsavel_id=diana.id,
+                         data_inicio=d, data_prevista=d + timedelta(days=2), criado_por_id=luisa.id, is_demo=True))
+    db.flush()
 
 
 if __name__ == "__main__":

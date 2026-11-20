@@ -34,7 +34,31 @@
 4. A Luísa consegue responder "o que precisa de mim?" apenas pela Central de Excepções.
 5. Sem pedidos de alteração bloqueantes por parte da equipa.
 
+## Fase 2 — Produção e Stock (implementada)
+
+| # | Entrega | Estado |
+|---|---|---|
+| 1 | Fornecedores e artigos (3 categorias, unidade, stock mínimo, custo médio, controlo de lotes) | ✅ |
+| 2 | Movimentos imutáveis: entradas, saídas, consumos, perdas, inventário físico (ajuste pela diferença) | ✅ |
+| 3 | Lotes e validades; saídas por FEFO (primeiro a expirar, primeiro a sair) | ✅ |
+| 4 | Fichas técnicas versionadas, com custo estimado de materiais (só CEO) | ✅ |
+| 5 | Ordens de produção: necessidades de materiais, iniciar, concluir (consumo + lote + entrada), cancelar, tarefa ligada | ✅ |
+| 6 | Rastreabilidade lote ⇄ ordem ⇄ lotes de matérias-primas | ✅ |
+| 7 | Não conformidades → ocorrência na Central de Excepções | ✅ |
+| 8 | Alertas: stock mínimo (Produção), ruptura e lotes expirados (também CEO), validade próxima | ✅ |
+| 9 | Relatórios: disponível, rupturas, a comprar, a produzir, validades, valor do inventário (CEO) | ✅ |
+| 10 | Dashboard e resumo executivo com stock/produção; Central de Excepções com rupturas reais | ✅ |
+| 11 | Testes: +9 de integração (41 no total) e fluxo ponta-a-ponta da produção | ✅ |
+
+Suposições da Fase 2 (configuráveis ou documentadas):
+- O consumo de materiais é calculado sobre a **quantidade planeada**; a diferença para a produzida aparece como rendimento (%).
+- Custo do produto = custo dos materiais consumidos ÷ unidades produzidas; mão-de-obra e outros custos atribuíveis entram na Fase 5.
+- Sugestão de compra = repor até **2× o stock mínimo**.
+- Alerta de validade com **30 dias** de antecedência (Definições).
+- Ruptura de matéria-prima e lotes expirados escalam para a CEO; "abaixo do mínimo" fica com a Produção.
+- Ficha técnica já usada não se edita: gera nova versão (a anterior fica inactiva).
+- Dados DEMO de stock não têm custos (não se inventam valores financeiros).
+
 ## Próximas fases (resumo)
-- **Fase 2** Produção e Stock: fichas técnicas, ordens de produção, lotes/validades, movimentos imutáveis, alertas de mínimo.
 - **Fase 3** Marketing: calendário editorial (importação CSV/Excel do calendário existente), fluxo IDEIA→ANÁLISE, assistente de IA com regras de marca e sem alegações médicas, aprovação humana obrigatória, adaptadores de integração sem simulação.
 - **Fase 4** Vendas e CRM; **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.

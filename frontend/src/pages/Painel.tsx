@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import type { EstadoActual, Indicadores, ResumoExecutivo, Tarefa } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Carregando, ErroCaixa, EstadoBadge, Kpi, PrioridadeBadge, Seccao, Vazio } from "../components/ui";
-import { fData, fDataHora, MESES, ROTULO_FUNCAO } from "../lib/formato";
+import { fData, fDataHora, fQtd, MESES, ROTULO_FUNCAO } from "../lib/formato";
 import { useDados } from "../lib/useDados";
 
 // Paleta validada (CVD/contraste) para as duas séries; o âmbar tem contraste < 3:1,
@@ -29,6 +29,24 @@ interface Executivo {
   resumo: ResumoExecutivo;
   modulos: { modulo: string; fase: number; estado: string }[];
   gerado_em: string;
+  stock: StockResumo;
+  producao: { planeadas: number; em_curso: number; atrasadas: number; nao_conformidades_abertas: number };
+}
+
+interface StockResumo { abaixo_minimo: { id: string; nome: string; categoria: string; unidade: string; disponivel: string; stock_minimo: string; ruptura: boolean }[];
+  total_abaixo_minimo: number; rupturas: number; lotes_validade_proxima: number; lotes_expirados: number }
+
+function CartaoStock({ s }: { s: StockResumo }) {
+  return (
+    <Seccao titulo="Stock baixo" accao={<Link to="/stock" className="text-sm text-folha-700 hover:underline">Ver stock</Link>}>
+      <p className="text-xs text-terra-700 mb-2">{s.total_abaixo_minimo} artigo(s) abaixo do mínimo · {s.rupturas} em ruptura · {s.lotes_validade_proxima} lote(s) perto da validade{s.lotes_expirados ? ` · ${s.lotes_expirados} expirado(s)` : ""}</p>
+      {!s.abaixo_minimo.length ? <p className="text-sm text-terra-700">Todos os artigos acima do mínimo.</p> : (
+        <ul className="divide-y divide-linho/60 text-sm">{s.abaixo_minimo.map((a) => (
+          <li key={a.id} className="py-1.5 flex justify-between gap-2"><span>{a.nome.replace(/^\[DEMO\] /, "")}</span>
+            <span className={a.ruptura ? "text-alerta font-medium" : "text-aviso"}>{fQtd(a.disponivel, a.unidade)} / mín. {fQtd(a.stock_minimo, a.unidade)}</span></li>))}</ul>
+      )}
+    </Seccao>
+  );
 }
 
 function rotuloPeriodo(tipo: string, inicio: string) {
@@ -128,8 +146,8 @@ function PainelExecutivo() {
                   <Tooltip cursor={{ fill: "#f6f1e9" }} labelFormatter={(l) => `Semana de ${l}`}
                     contentStyle={{ borderRadius: 12, border: "1px solid #e2d6c3", fontSize: 12, color: "#3d2e22" }} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: "#3d2e22" }} />
-                  <Bar dataKey="criadas" name="Criadas" fill={COR_CRIADAS} radius={[4, 4, 0, 0]} maxBarSize={18} />
-                  <Bar dataKey="concluidas" name="Concluídas" fill={COR_CONCLUIDAS} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                  <Bar dataKey="criadas" name="Criadas" fill={COR_CRIADAS} radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />
+                  <Bar dataKey="concluidas" name="Concluídas" fill={COR_CONCLUIDAS} radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -149,6 +167,18 @@ function PainelExecutivo() {
               ))}
             </tbody>
           </table>
+        </Seccao>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <CartaoStock s={d.stock} />
+        <Seccao titulo="Estado da produção" accao={<Link to="/producao" className="text-sm text-folha-700 hover:underline">Ver produção</Link>}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><p className="text-xs text-terra-700">Ordens planeadas</p><p className="font-serif text-2xl">{d.producao.planeadas}</p></div>
+            <div><p className="text-xs text-terra-700">Em curso</p><p className="font-serif text-2xl">{d.producao.em_curso}</p></div>
+            <div><p className="text-xs text-terra-700">Atrasadas</p><p className={`font-serif text-2xl ${d.producao.atrasadas ? "text-alerta" : ""}`}>{d.producao.atrasadas}</p></div>
+            <div><p className="text-xs text-terra-700">Não conformidades abertas</p><p className={`font-serif text-2xl ${d.producao.nao_conformidades_abertas ? "text-aviso" : ""}`}>{d.producao.nao_conformidades_abertas}</p></div>
+          </div>
         </Seccao>
       </div>
 
@@ -203,6 +233,7 @@ function ListaTarefas({ tarefas, vazio }: { tarefas: Tarefa[]; vazio: string }) 
 interface Pessoal {
   estado_actual: EstadoActual; mes: Indicadores; meta_cumprimento: number;
   em_atraso: Tarefa[]; hoje: Tarefa[]; esta_semana: Tarefa[]; bloqueadas: Tarefa[]; aguardar_aprovacao: Tarefa[];
+  stock: StockResumo | null;
 }
 
 function PainelPessoal() {
@@ -230,6 +261,7 @@ function PainelPessoal() {
         <Seccao titulo="Em atraso"><ListaTarefas tarefas={d.em_atraso} vazio="Nada em atraso. Excelente!" /></Seccao>
         <Seccao titulo="Para hoje"><ListaTarefas tarefas={d.hoje} vazio="Sem prazos para hoje." /></Seccao>
         <Seccao titulo="Esta semana"><ListaTarefas tarefas={d.esta_semana} vazio="Sem prazos nos próximos dias." /></Seccao>
+        {d.stock && <CartaoStock s={d.stock} />}
         <Seccao titulo="À espera de alguém">
           {d.bloqueadas.length + d.aguardar_aprovacao.length === 0 ? <Vazio titulo="Nada parado" texto="Sem tarefas bloqueadas ou a aguardar aprovação." /> :
             <ListaTarefas tarefas={[...d.bloqueadas, ...d.aguardar_aprovacao]} vazio="" />}
@@ -237,6 +269,7 @@ function PainelPessoal() {
       </div>
       <div className="flex gap-2 flex-wrap">
         <Link to="/tarefas" className="btn-primario">Ver as minhas tarefas</Link>
+        {d.stock && <Link to="/producao" className="btn-secundario">Ordens de produção</Link>}
         <Link to="/ocorrencias" className="btn-secundario">Comunicar uma ocorrência</Link>
       </div>
     </div>

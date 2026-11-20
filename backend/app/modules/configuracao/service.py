@@ -16,6 +16,7 @@ PADRAO: dict[str, dict] = {
     "dias_aprovacao_pendente": {"valor": 2, "descricao": "Dias a aguardar aprovação até gerar alerta"},
     "dia_planeamento": {"valor": 0, "descricao": "Dia do planeamento semanal (0 = segunda-feira)"},
     "dia_revisao": {"valor": 4, "descricao": "Dia da revisão semanal (4 = sexta-feira)"},
+    "dias_alerta_validade": {"valor": 30, "descricao": "Dias antes da validade para alertar sobre lotes em stock"},
     "moeda": {"valor": "AOA", "descricao": "Moeda base (Kwanza)"},
 }
 

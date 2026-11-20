@@ -15,3 +15,12 @@ describe("formatação PT", () => {
     expect(segundaDe("2026-11-16")).toBe("2026-11-16");
   });
 });
+
+import { fQtd } from "./formato";
+describe("quantidades", () => {
+  it("formata em pt-PT com unidade", () => {
+    expect(fQtd("1234.500", "ml")).toBe("1234,5 ml"); // pt-PT só agrupa a partir de 5 dígitos
+    expect(fQtd("12345", "un").replace(/\s/g, " ")).toBe("12 345 un.");
+    expect(fQtd(null)).toBe("—");
+  });
+});

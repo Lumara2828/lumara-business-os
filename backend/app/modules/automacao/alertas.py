@@ -57,6 +57,10 @@ def verificar(db: Session) -> dict:
                       chave_dedup=f"aprov:{t.id}:{d.isoformat()}")
         criados["aprovacao_parada"] += 1
 
+    db.flush()
+    criados.update(verificar_stock(db, commit=False))
+    criados.update(verificar_validades(db))
+
     linha = db.get(Configuracao, "_ultima_verificacao_alertas")
     marca = {"valor": agora().isoformat()}
     if linha is None:
@@ -75,3 +79,49 @@ def verificar_se_necessario(db: Session) -> None:
         if agora() - ultima < INTERVALO_MINIMO:
             return
     verificar(db)
+
+
+def _ids_producao(db: Session) -> list:
+    from app.modules.equipa.models import Utilizador
+    return list(db.scalars(select(Utilizador.id).where(Utilizador.funcao == "producao", Utilizador.activo.is_(True))))
+
+
+def verificar_stock(db: Session, artigo_ids=None, commit: bool = True) -> dict:
+    """Stock abaixo do mínimo alerta a Produção; ruptura (zero) alerta também a CEO.
+    Um alerta por artigo e por dia."""
+    from app.modules.stock import service as stock
+    d = hoje().isoformat()
+    n_min = n_rup = 0
+    for a, q in stock.abaixo_minimo(db):
+        if artigo_ids is not None and a.id not in set(artigo_ids):
+            continue
+        ruptura = q <= 0
+        titulo = f"{'Ruptura' if ruptura else 'Stock abaixo do mínimo'}: {a.nome}"
+        msg = f"Disponível {stock.fmt_qtd(q, a.unidade)} (mínimo {stock.fmt_qtd(a.stock_minimo, a.unidade)})."
+        for uid in _ids_producao(db):
+            notificar(db, uid, "stock_minimo", titulo, msg, "/stock", chave_dedup=f"stock:{a.id}:{d}:{uid}")
+        n_min += 1
+        if ruptura:
+            notificar_ceo(db, "ruptura_stock", titulo, msg, "/stock", chave_dedup=f"ruptura:{a.id}:{d}")
+            n_rup += 1
+    if commit:
+        db.commit()
+    return {"stock_minimo": n_min, "rupturas": n_rup}
+
+
+def verificar_validades(db: Session) -> dict:
+    from app.modules.stock import service as stock
+    dias = int(config.obter(db, "dias_alerta_validade"))
+    d = hoje()
+    n_prox = n_exp = 0
+    for lote, q in stock.proximos_validade(db, dias):
+        expirado = lote.validade < d
+        titulo = f"{'Lote expirado' if expirado else 'Validade próxima'}: {lote.artigo.nome} (lote {lote.numero})"
+        msg = f"{stock.fmt_qtd(q, lote.artigo.unidade)} em stock, {stock.descrever_validade(lote)}."
+        for uid in _ids_producao(db):
+            notificar(db, uid, "validade", titulo, msg, "/stock", chave_dedup=f"val:{lote.id}:{d.isoformat()}:{uid}")
+        n_prox += 1
+        if expirado:
+            notificar_ceo(db, "validade", titulo, msg, "/stock", chave_dedup=f"exp:{lote.id}:{d.isoformat()}")
+            n_exp += 1
+    return {"validade_proxima": n_prox, "lotes_expirados": n_exp}

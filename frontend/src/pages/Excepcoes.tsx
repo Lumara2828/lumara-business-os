@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { Tarefa } from "../api/types";
 import { useToast } from "../components/Toast";
 import { Carregando, ErroCaixa, PrioridadeBadge, Vazio } from "../components/ui";
-import { fData, relativo } from "../lib/formato";
+import { fData, fQtd, relativo } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 interface OccItem { id: string; numero: number; tipo_rotulo: string; gravidade: string; estado: string; titulo: string; descricao: string; reportada_por: string; criada_em: string }
@@ -11,7 +11,9 @@ interface Dados { total: number; dias_atraso_alerta_ceo: number; data: string; s
   aprovacoes: Tarefa[]; bloqueadas: Tarefa[]; criticas: Tarefa[]; atrasos: Tarefa[];
   problemas_producao: OccItem[]; rupturas_stock: OccItem[]; reclamacoes: OccItem[]; despesas_fora_orcamento: OccItem[];
   encomendas_problematicas: OccItem[]; outras_ocorrencias: OccItem[];
-  desvios_metas: { indicador: string; meta: number; actual: number; mensagem: string }[] } }
+  desvios_metas: { indicador: string; meta: number; actual: number; mensagem: string }[];
+  stock_critico: { id: string; nome: string; unidade: string; disponivel: string; stock_minimo: string; ruptura: boolean }[];
+  lotes_expirados: { id: string; numero: string; artigo: string; validade: string; saldo: string; unidade: string }[] } }
 
 export default function Excepcoes() {
   const toast = useToast();
@@ -39,7 +41,21 @@ export default function Excepcoes() {
         <BlocoTarefas titulo={`Atrasos relevantes (≥ ${d.dias_atraso_alerta_ceo} dias ou críticos)`} tarefas={s.atrasos} />
         <BlocoTarefas titulo="Tarefas críticas em curso" tarefas={s.criticas} />
         <BlocoOcc titulo="Problemas de produção" itens={s.problemas_producao} />
-        <BlocoOcc titulo="Rupturas e necessidades de stock" itens={s.rupturas_stock} nota="Até à Fase 2 (Stock), comunicadas como ocorrências." />
+        <Bloco titulo="Rupturas de stock" n={s.stock_critico.length + s.rupturas_stock.length}>
+          {s.stock_critico.length === 0 && s.rupturas_stock.length === 0 ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">
+              {s.stock_critico.map((a) => <li key={a.id}><Link to="/stock" className="flex justify-between gap-2 py-2 hover:underline">
+                <span>{a.nome.replace(/^\[DEMO\] /, "")}</span><span className={a.ruptura ? "text-alerta font-medium" : "text-aviso"}>
+                  {a.ruptura ? "ruptura" : `${fQtd(a.disponivel, a.unidade)} / mín. ${fQtd(a.stock_minimo, a.unidade)}`}</span></Link></li>)}
+              {s.rupturas_stock.map((o) => <li key={o.id}><Link to="/ocorrencias" className="block py-2 hover:underline">O-{String(o.numero).padStart(4, "0")} · {o.titulo} <span className="text-xs text-terra-700">({o.reportada_por})</span></Link></li>)}
+            </ul>)}
+          <p className="text-[11px] text-terra-500 mt-2">Artigos em ruptura e produtos acabados abaixo do mínimo; as matérias-primas apenas abaixo do mínimo são tratadas pela Produção.</p>
+        </Bloco>
+        <Bloco titulo="Lotes expirados com stock" n={s.lotes_expirados.length}>
+          {!s.lotes_expirados.length ? <p className="text-sm text-terra-700">Nenhum.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">{s.lotes_expirados.map((l) => <li key={l.id} className="py-2 flex justify-between gap-2">
+              <span>{l.artigo.replace(/^\[DEMO\] /, "")} · lote {l.numero}</span><span className="text-alerta">{fQtd(l.saldo, l.unidade)} · expirou {fData(l.validade)}</span></li>)}</ul>)}
+        </Bloco>
         <BlocoOcc titulo="Reclamações" itens={s.reclamacoes} />
         <BlocoOcc titulo="Despesas fora do orçamento" itens={s.despesas_fora_orcamento} nota="Até à Fase 5 (Finanças), comunicadas como ocorrências." />
         <BlocoOcc titulo="Encomendas problemáticas" itens={s.encomendas_problematicas} />

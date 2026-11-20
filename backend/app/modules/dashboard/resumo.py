@@ -41,7 +41,7 @@ def resumo_executivo(db: Session) -> dict:
                          "acompanhar."), "atencao"
     else:
         estado, nivel = f"Cumprimento abaixo da meta: {taxa}% no prazo (meta {meta}%), {act['em_atraso']} tarefa(s) em atraso.", "critico"
-    estado += " Indicadores financeiros e comerciais ficam disponíveis a partir das Fases 4 e 5."
+    estado += " Indicadores comerciais e financeiros ficam disponíveis a partir das Fases 4 e 5."
 
     # 2. O que está a correr bem?
     bem = []
@@ -60,10 +60,19 @@ def resumo_executivo(db: Session) -> dict:
                for t in atrasadas[:8]]
 
     # 4. Onde estamos a perder dinheiro?
+    from app.modules.stock import service as stock_svc
+    from app.modules.stock.models import Movimento
+    from sqlalchemy import func as _f
+    perdas_stock = db.execute(select(Movimento.artigo_id, _f.sum(Movimento.quantidade)).where(
+        Movimento.tipo == "perda", Movimento.data_movimento >= ini).group_by(Movimento.artigo_id)).all()
     perdas = [f"{o.titulo} ({o.gravidade})" for o in ocorrencias if o.tipo in ("despesa_imprevista", "problema_producao",
                                                                                  "encomenda_problematica")]
-    perdas_nota = ("Sem dados financeiros: o cálculo de margens, custos e perdas fica disponível com os módulos de "
-                   "Produção/Stock (Fase 2) e Finanças (Fase 5). Abaixo, ocorrências registadas com possível impacto financeiro.")
+    from app.modules.stock.models import Artigo as _Artigo
+    for aid, q in perdas_stock:
+        a = db.get(_Artigo, aid)
+        perdas.append(f"Perdas de stock este mês: {stock_svc.fmt_qtd(-q, a.unidade)} de {a.nome}.")
+    perdas_nota = ("Margens e resultado ficam disponíveis com o módulo de Finanças (Fase 5). Abaixo: perdas de stock "
+                   "registadas este mês e ocorrências com possível impacto financeiro.")
 
     # 5. O que precisa da intervenção da CEO?
     intervencao = []
@@ -76,6 +85,13 @@ def resumo_executivo(db: Session) -> dict:
     for t in atrasadas:
         if dias_atraso(t) >= dias_ceo and t.estado not in ("bloqueada", "aguardar_aprovacao"):
             intervencao.append(f"{codigo(t)} com {dias_atraso(t)} dia(s) de atraso ({t.responsavel.nome}).")
+    from app.modules.stock import service as stock
+    for a, q in stock.abaixo_minimo(db):
+        if q <= 0:
+            intervencao.append(f"Ruptura de stock: {a.nome}.")
+    for lote, q in stock.proximos_validade(db, 0):
+        if lote.validade < d:
+            intervencao.append(f"Lote {lote.numero} de {lote.artigo.nome} expirado com stock ({stock.fmt_qtd(q, lote.artigo.unidade)}): decidir destino.")
     for o in ocorrencias:
         if o.gravidade in ("alta", "critica"):
             intervencao.append(f"Ocorrência {o.gravidade}: {o.titulo} ({o.reportada_por.nome}).")
