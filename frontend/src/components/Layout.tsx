@@ -13,6 +13,8 @@ const ICONES: Record<string, string> = {
   rotina: "M4 5h16v15H4zM4 9h16M8 3v4M16 3v4",
   ocorrencias: "M5 4h14v12H8l-3 3z",
   responsabilidades: "M4 6h16M4 12h16M4 18h16M10 6v12",
+  vendas: "M5 7h14l-1.5 9h-11zM9 7V5a3 3 0 016 0v2M9 20a1 1 0 100-2M16 20a1 1 0 100-2",
+  eventos: "M4 21V5l8-2 8 2v16M9 21v-5h6v5M8 9h2M14 9h2",
   marketing: "M4 10v4l12 5V5zM16 9a3 3 0 010 6M7 14l1 5h3l-1-4",
   producao: "M4 20V10l5 3V10l5 3V6h6v14zM8 17h2M13 17h2",
   stock: "M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10",
@@ -28,7 +30,6 @@ function Icone({ nome }: { nome: string }) {
 }
 
 const PROXIMAS = [
-  ["Fase 4", "Vendas, Clientes e Eventos"],
   ["Fase 5", "Finanças · Procedimentos"], ["Fase 6", "Automação avançada"],
 ];
 
@@ -43,6 +44,8 @@ export default function Layout() {
     { a: "/tarefas", n: "Tarefas", i: "tarefas" },
     pode("excepcoes.ver") && { a: "/excepcoes", n: "Central de Excepções", i: "excepcoes" },
     pode("relatorios.equipa") && { a: "/rotina", n: "Rotina semanal", i: "rotina" },
+    (pode("vendas.gerir") || pode("encomendas.preparar")) && { a: "/vendas", n: pode("vendas.gerir") ? "Vendas e clientes" : "Encomendas", i: "vendas" },
+    pode("eventos.ver") && { a: "/eventos", n: "Eventos e feiras", i: "eventos" },
     pode("marketing.calendario") && { a: "/marketing", n: "Marketing", i: "marketing" },
     pode("stock.ver") && { a: "/producao", n: "Produção", i: "producao" },
     pode("stock.ver") && { a: "/stock", n: "Stock e inventário", i: "stock" },

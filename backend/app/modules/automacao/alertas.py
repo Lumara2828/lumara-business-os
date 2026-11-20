@@ -61,6 +61,7 @@ def verificar(db: Session) -> dict:
     criados.update(verificar_stock(db, commit=False))
     criados.update(verificar_validades(db))
     criados.update(verificar_conteudos(db))
+    criados.update(verificar_encomendas(db))
 
     linha = db.get(Configuracao, "_ultima_verificacao_alertas")
     marca = {"valor": agora().isoformat()}
@@ -144,3 +145,39 @@ def verificar_conteudos(db: Session) -> dict:
                   "/marketing", chave_dedup=f"cont:{c.id}:{d.isoformat()}")
         n += 1
     return {"conteudos_atraso": n}
+
+
+def verificar_encomendas(db: Session) -> dict:
+    """Entrega amanhã ainda não pronta → Produção; entrega atrasada → responsável (e CEO após o limite);
+    pagamento em falta após `dias_cobranca` → responsável e CEO."""
+    from app.modules.vendas.models import Encomenda
+    from app.modules.vendas.router import por_receber
+    d = hoje()
+    dias_ceo = int(config.obter(db, "dias_atraso_alerta_ceo"))
+    n = 0
+    abertas = db.scalars(select(Encomenda).where(Encomenda.estado.in_(("recebida", "em_preparacao", "pronta")),
+                                                 Encomenda.data_prevista.is_not(None))).unique().all()
+    for e in abertas:
+        cod = f"E-{e.numero:04d}"
+        if e.data_prevista == d + timedelta(days=1) and e.estado != "pronta":
+            for uid in _ids_producao(db):
+                notificar(db, uid, "encomenda", f"Entrega amanhã: {cod}", f"{e.cliente.nome} — ainda não está pronta.", "/vendas",
+                          chave_dedup=f"enc-amanha:{e.id}:{d.isoformat()}:{uid}")
+            n += 1
+        elif e.data_prevista < d:
+            atraso = (d - e.data_prevista).days
+            notificar(db, e.responsavel_id, "encomenda", f"Encomenda atrasada: {cod}", f"{e.cliente.nome} — prevista a {formatar_data(e.data_prevista)}.",
+                      "/vendas", chave_dedup=f"enc-atraso:{e.id}:{d.isoformat()}")
+            if atraso >= dias_ceo:
+                notificar_ceo(db, "encomenda", f"Encomenda com {atraso} dia(s) de atraso: {cod}", e.cliente.nome, "/vendas",
+                              chave_dedup=f"enc-atraso-ceo:{e.id}:{d.isoformat()}")
+            n += 1
+    for i in por_receber(db)["itens"]:
+        if i["atrasado"]:
+            e = db.get(Encomenda, i["id"])
+            titulo = f"Pagamento em falta: {i['codigo']}"
+            msg = f"{i['cliente']} — {i['em_divida_kz']} Kz, entregue há {i['dias']} dias."
+            notificar(db, e.responsavel_id, "cobranca", titulo, msg, "/vendas", chave_dedup=f"cob:{e.id}:{d.isoformat()}")
+            notificar_ceo(db, "cobranca", titulo, msg, "/vendas", chave_dedup=f"cob-ceo:{e.id}:{d.isoformat()}")
+            n += 1
+    return {"encomendas": n}

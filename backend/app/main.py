@@ -22,6 +22,7 @@ from app.modules.auth.router import router as auth
 from app.modules.configuracao.router import router as configuracao
 from app.modules.dashboard.router import router as dashboard
 from app.modules.equipa.router import router as equipa
+from app.modules.eventos.router import router as eventos
 from app.modules.ia.router import router as ia
 from app.modules.integracoes.router import router as integracoes
 from app.modules.marketing.router import router as marketing
@@ -32,10 +33,11 @@ from app.modules.producao.router import router as producao
 from app.modules.rotina.router import router as rotina
 from app.modules.stock.router import router as stock
 from app.modules.tarefas.router import router as tarefas
+from app.modules.vendas.router import router as vendas
 
 log = logging.getLogger("lumara")
 
-app = FastAPI(title="Lumara Business OS — API", version="3.0.0-fase3",
+app = FastAPI(title="Lumara Business OS — API", version="4.0.0-fase4",
               docs_url="/docs" if settings.ambiente != "producao" else None, redoc_url=None)
 app.state.limiter = limiter
 app.add_middleware(CORSMiddleware, allow_origins=settings.lista_cors, allow_methods=["*"],
@@ -53,7 +55,7 @@ async def cabecalhos_seguranca(request: Request, call_next):
 
 
 for r in (auth, equipa, tarefas, notificacoes, ocorrencias, responsabilidades, rotina, dashboard, auditoria, configuracao,
-          stock, producao, marketing, ia, integracoes):
+          stock, producao, marketing, ia, integracoes, vendas, eventos):
     app.include_router(r)
 
 

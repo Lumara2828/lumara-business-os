@@ -37,10 +37,18 @@ def limpar(db):
     # Movimentos de stock são imutáveis; remover os DEMO é uma operação administrativa explícita
     # (o trigger é suspenso só dentro desta transacção e reactivado no fim).
     db.execute(text("ALTER TABLE movimentos_stock DISABLE TRIGGER movimentos_stock_imutavel"))
+    db.execute(text("ALTER TABLE pagamentos DISABLE TRIGGER pagamentos_imutavel"))
+    db.execute(text("DELETE FROM pagamentos WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo)"))
+    db.execute(text("ALTER TABLE pagamentos ENABLE TRIGGER pagamentos_imutavel"))
+    db.execute(text("DELETE FROM movimentos_stock WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo)"))
     db.execute(text("UPDATE ordens_producao SET lote_id = NULL, tarefa_id = NULL WHERE is_demo"))
     db.execute(text("DELETE FROM nao_conformidades WHERE ordem_id IN (SELECT id FROM ordens_producao WHERE is_demo)"))
     db.execute(text("DELETE FROM movimentos_stock WHERE artigo_id IN (SELECT id FROM artigos WHERE is_demo)"))
     db.execute(text("ALTER TABLE movimentos_stock ENABLE TRIGGER movimentos_stock_imutavel"))
+    db.execute(text("DELETE FROM encomendas WHERE is_demo"))
+    db.execute(text("DELETE FROM eventos WHERE is_demo"))
+    db.execute(text("DELETE FROM clientes WHERE is_demo"))
+    db.execute(text("DELETE FROM precos WHERE is_demo"))
     db.execute(text("DELETE FROM lotes WHERE artigo_id IN (SELECT id FROM artigos WHERE is_demo)"))
     db.execute(text("DELETE FROM ordens_producao WHERE is_demo"))
     db.execute(text("DELETE FROM ficha_ingredientes WHERE ficha_id IN (SELECT id FROM fichas_tecnicas WHERE is_demo)"))
@@ -173,6 +181,7 @@ def semear(db):
     db.flush()
     semear_producao(db, u["producao"], u["ceo"])
     semear_marketing(db, u["marketing"], u["ceo"])
+    semear_vendas(db, u["marketing"], u["producao"], u["ceo"])
     db.commit()
     print("Dados DEMO criados.")
     for nome, email, funcao, _ in USERS:
@@ -278,6 +287,62 @@ def semear_marketing(db, maira, luisa):
         if estado == "publicado":
             c.publicado_em = agora()
         db.add(c)
+    db.flush()
+
+
+def semear_vendas(db, maira, diana, luisa):
+    """Fase 4 — clientes, preços FICTÍCIOS de demonstração, encomendas e uma feira (tudo DEMO)."""
+    from decimal import Decimal as D
+    from app.dependencies import Contexto
+    from app.modules.eventos.models import Evento, EventoProduto, EventoTarefa
+    from app.modules.stock.models import Artigo
+    from app.modules.vendas import service as vs
+    from app.modules.vendas.models import Cliente, Encomenda, Preco
+
+    ctx_m = Contexto(utilizador=maira, sessao=None, ip=None)
+    ctx_d = Contexto(utilizador=diana, sessao=None, ip=None)
+    d = hoje()
+    prods = {a.codigo: a for a in db.scalars(select(Artigo).where(Artigo.is_demo.is_(True), Artigo.categoria == "produto_acabado"))}
+    unhas, corpo = prods["DEMO-PA-UNHAS30"], prods["DEMO-PA-CORPO100"]
+    for a, p in ((unhas, "4500"), (corpo, "7000")):
+        db.add(Preco(artigo_id=a.id, preco_kz=D(p), vigente_desde=d - timedelta(days=60), definido_por_id=luisa.id, is_demo=True,
+                     motivo="[DEMO] Preço fictício de demonstração — substituir pelo preço real"))
+    db.flush()
+    cli = []
+    for nome, tel, loc, origem, cons in (("Cliente A (DEMO)", "923000101", "Luanda", "instagram", True),
+                                         ("Cliente B (DEMO)", "923000102", "Talatona", "whatsapp", True),
+                                         ("Cliente C (DEMO)", "923000103", "Viana", "feira", False)):
+        c = Cliente(nome=nome, whatsapp=tel, localidade=loc, origem=origem, consentimento_marketing=cons, is_demo=True, criado_por_id=maira.id)
+        db.add(c)
+        cli.append(c)
+    db.flush()
+
+    def enc(cliente, qtd, estado, dias_prev, pago=None, desconto="0"):
+        e = Encomenda(cliente_id=cliente.id, data_encomenda=d - timedelta(days=3), canal="whatsapp", responsavel_id=maira.id,
+                      criado_por_id=maira.id, data_prevista=d + timedelta(days=dias_prev), is_demo=True)
+        vs.aplicar_linhas(db, ctx_m, e, [vs.LinhaIn(artigo_id=unhas.id, quantidade=D(qtd))], D(desconto), D(0))
+        db.add(e)
+        db.flush()
+        db.refresh(e)
+        if estado in ("pronta", "entregue"):
+            vs.mudar_estado(db, ctx_d, e, "pronta")
+        if estado == "entregue":
+            vs.mudar_estado(db, ctx_d, e, "entregue")
+        if pago:
+            vs.registar_pagamento(db, ctx_m, e, D(pago), d, "multicaixa_express", None, None, is_demo=True)
+        return e
+
+    enc(cli[0], 2, "entregue", -1, pago="9000")
+    enc(cli[1], 3, "entregue", -2, pago="5000")
+    enc(cli[0], 1, "pronta", 1)
+    enc(cli[2], 2, "recebida", 3, desconto="2000")
+    ev = Evento(nome="[DEMO] Feira de artesanato de Dezembro", data_inicio=d + timedelta(days=12), data_fim=d + timedelta(days=13),
+                local="Luanda (local a confirmar)", objectivo="Vender kits e captar novas clientes.", responsavel_id=maira.id,
+                criado_por_id=maira.id, is_demo=True)
+    ev.checklist = [EventoTarefa(texto=t, ordem=n) for n, t in enumerate(
+        ["Confirmar inscrição e localização da banca", "Preparar produtos e etiquetas de preço", "Levar TPA/terminal e troco"])]
+    ev.produtos = [EventoProduto(artigo_id=unhas.id, quantidade_planeada=D(10))]
+    db.add(ev)
     db.flush()
 
 

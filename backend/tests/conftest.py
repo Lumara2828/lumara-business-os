@@ -46,7 +46,8 @@ def _limpar():
         tabelas = [r[0] for r in c.execute(text(
             "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> 'alembic_version'"))]
         c.execute(text(f"TRUNCATE {', '.join(tabelas)} RESTART IDENTITY CASCADE"))
-        c.execute(text("ALTER SEQUENCE seq_codigo_tarefa RESTART; ALTER SEQUENCE seq_codigo_ocorrencia RESTART"))
+        for (seq,) in c.execute(text("SELECT sequence_name FROM information_schema.sequences WHERE sequence_name LIKE 'seq_codigo_%'")):
+            c.execute(text(f"ALTER SEQUENCE {seq} RESTART"))
     with SessionLocal() as db:
         garantir_base(db)
     yield

@@ -65,7 +65,20 @@ Stock disponível = soma dos movimentos (por artigo e por lote); nunca é uma co
 | `campanhas` | nome, objectivo, público, mensagem-chave, canais, datas, orcamento_kz, estado, responsável, aprovação, resultados | datas válidas; orçamento ≥ 0 |
 | `interacoes_ia` | utilizador, tipo, pedido, resposta, estado (ok/recusa/erro), fornecedor, modelo, tokens | auditoria e custo |
 
-## Fases 4–6 — modelo previsto (não implementado)
+## Fase 4 — implementado (migração `0004`)
+
+| Tabela | Campos principais | Regras |
+|---|---|---|
+| `clientes` | nome, telefone, whatsapp, email, localidade, morada, origem, preferências, observações, consentimento_marketing (+data) | — |
+| `precos` | artigo_id, preco_kz, vigente_desde, definido_por, motivo | histórico; preço ≥ 0 |
+| `encomendas` | numero (E-0001), cliente, data, canal, evento_id, estado, forma de pagamento, subtotal/desconto/taxa/total, desconto_requer_aprovacao, entrega (tipo, morada, data prevista, entregue_em), cancelamento | **total = subtotal − desconto + taxa**; entregue ⇒ data; cancelada ⇒ motivo |
+| `linhas_encomenda` | artigo, quantidade, preço unitário (fotografia), desconto, total | total = qtd × preço − desconto |
+| `pagamentos` | encomenda, valor (negativo = estorno), data, forma, referência, motivo | **trigger impede UPDATE/DELETE**; estorno exige motivo |
+| `movimentos_stock.encomenda_id` | ligação da saída de stock (por lote) à encomenda | rastreabilidade lote → cliente |
+| `eventos` | nome, datas, local, objectivo, orçamento, meta de vendas, responsável, estado, materiais, resultados, contactos | — |
+| `evento_produtos` / `evento_checklist` / `evento_custos` | produtos a levar (planeado/levado/devolvido), checklist, custos | — |
+
+## Fases 5–6 — modelo previsto (não implementado)
 
 ```mermaid
 erDiagram

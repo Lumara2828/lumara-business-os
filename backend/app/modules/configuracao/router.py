@@ -16,6 +16,9 @@ LIMITES = {
     "dias_atraso_alerta_ceo": (0, 30),
     "dias_aprovacao_pendente": (0, 30),
     "dias_alerta_validade": (1, 365),
+    "limite_desconto_pct": (0, 100),
+    "dias_cobranca": (1, 90),
+    "dias_cliente_inactivo": (15, 730),
     "dia_planeamento": (0, 6),
     "dia_revisao": (0, 6),
 }

@@ -190,6 +190,60 @@ await luisa.click("role=tab[name='Integrações']");
 await luisa.waitForSelector("text=Nenhuma integração é simulada");
 assert.equal(await diana.locator("nav >> text=Marketing").count(), 0, "Diana não vê o marketing");
 
+// --- Fase 4: vendas e eventos ---
+await maira.goto(`${BASE}/vendas`);
+await maira.waitForSelector("text=Vendas e clientes");
+await maira.click("button:has-text('+ Encomenda')");
+await maira.selectOption("#enc-cli", { label: await maira.locator("#enc-cli option", { hasText: "Cliente B (DEMO)" }).textContent() });
+const optUnhas = await maira.locator("select[aria-label='Produto 1'] option", { hasText: "fortalecedor" }).textContent();
+await maira.selectOption("select[aria-label='Produto 1']", { label: optUnhas });
+await maira.fill("input[aria-label='Quantidade']", "2");
+await maira.click("role=dialog >> button:has-text('Criar encomenda')");
+await maira.waitForSelector("role=dialog >> text=Recebida");
+const codigoEnc = (await maira.locator("role=dialog >> h2").first().textContent()).split(" · ")[0];
+await foto(maira, "21-encomenda-telemovel");
+await maira.keyboard.press("Escape");
+
+await diana.goto(`${BASE}/vendas`);
+await diana.waitForSelector(`text=${codigoEnc}`);
+assert.equal(await diana.locator("text=Kz").count(), 0, "Diana não vê valores das encomendas");
+await diana.click(`text=${codigoEnc}`);
+await diana.click("role=dialog >> button:has-text('Marcar como pronta')");
+await diana.waitForSelector("role=dialog >> text=Pronta");
+diana.once("dialog", (d) => d.accept());
+await diana.click("role=dialog >> button:has-text('Marcar como entregue')");
+await diana.waitForSelector("role=dialog >> text=Lotes entregues");
+await diana.keyboard.press("Escape");
+
+await maira.reload();
+await maira.selectOption("select[aria-label='Filtro']", "por_pagar");
+await maira.click(`text=${codigoEnc}`);
+await maira.click("role=dialog >> button:has-text('Registar pagamento')");
+await maira.click("role=dialog >> button:has-text('Registar') >> nth=-1");
+await maira.waitForSelector("role=dialog >> text=Pagamentos");
+await maira.keyboard.press("Escape");
+
+await maira.goto(`${BASE}/eventos`);
+await maira.click("text=Feira de artesanato");
+await maira.click("role=dialog >> button:has-text('Registar venda no evento')");
+const opt2 = await maira.locator("select[aria-label='Produto 1'] >> nth=-1 >> option", { hasText: "fortalecedor" }).textContent();
+await maira.locator("select[aria-label='Produto 1']").last().selectOption({ label: opt2 });
+await maira.click("button:has-text('Registar venda') >> nth=-1");
+await maira.waitForSelector("text=Vendas registadas");
+
+await luisa.goto(`${BASE}/vendas`);
+await luisa.click("role=tab[name='Relatórios']");
+await luisa.waitForSelector("text=Contas a receber");
+await foto(luisa, "22-vendas-relatorios");
+await luisa.goto(`${BASE}/eventos`);
+await luisa.click("text=Feira de artesanato");
+await luisa.waitForSelector("text=Resultado do evento");
+await foto(luisa, "23-evento");
+await luisa.keyboard.press("Escape");
+await luisa.goto(`${BASE}/`);
+await luisa.waitForSelector("text=Facturação (entregues)");
+await foto(luisa, "24-painel-ceo-fase4");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

@@ -130,3 +130,14 @@ export const ESTADOS_CONTEUDO: { valor: string; rotulo: string; classe: string }
 ];
 export const COR_CATEGORIA: Record<string, string> = { educativo: "#5e7153", produto: "#9c6644", bastidores: "#8c7b6b",
   testemunhos: "#b08968", promocoes: "#c08a2e", eventos: "#47573f" };
+
+export const CANAIS: Record<string, string> = { whatsapp: "WhatsApp", instagram: "Instagram", facebook: "Facebook", loja: "Loja / balcão",
+  feira: "Feira / evento", telefone: "Telefone", outro: "Outro" };
+export const FORMAS_PAGAMENTO: Record<string, string> = { transferencia: "Transferência", multicaixa_express: "Multicaixa Express", tpa: "TPA",
+  numerario: "Numerário", outro: "Outro" };
+export const ESTADOS_ENCOMENDA: Record<string, [string, string]> = {
+  recebida: ["Recebida", "bg-areia text-terra-700"], em_preparacao: ["Em preparação", "bg-folha-100 text-folha-700"],
+  pronta: ["Pronta", "bg-folha-300/50 text-folha-700"], entregue: ["Entregue", "bg-folha-600 text-white"], cancelada: ["Cancelada", "bg-linho text-terra-700"] };
+export const ESTADOS_PAGAMENTO: Record<string, [string, string]> = {
+  pendente: ["Por pagar", "bg-amber-100 text-aviso"], parcial: ["Pago parcialmente", "bg-amber-50 text-aviso"], pago: ["Pago", "bg-folha-100 text-folha-700"],
+  a_reembolsar: ["A reembolsar", "bg-red-50 text-alerta"], sem_pagamento: ["—", "bg-areia"] };

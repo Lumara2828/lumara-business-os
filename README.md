@@ -1,8 +1,8 @@
 # Lumara Business OS
 
 Plataforma integrada de gestão da **Lumara Cosméticos Artesanais** (Angola). Estado: **Fase 1 — Autonomia
-operacional** **Fase 2 — Produção e Stock** e **Fase 3 — Marketing com IA**
-implementadas e testadas.
+operacional** **Fase 2 — Produção e Stock**, **Fase 3 — Marketing com IA** e
+**Fase 4 — Vendas, Clientes e Eventos** implementadas e testadas.
 
 - `backend/` — API FastAPI + PostgreSQL (SQLAlchemy 2, Alembic)
 - `frontend/` — React 19 + TypeScript + Tailwind CSS 4 + Recharts
@@ -53,10 +53,10 @@ Depois, na app, a CEO cria as contas da Maira e da Diana em **Equipa** (palavra-
 
 ## Testes
 ```bash
-cd backend && createdb lumara_test && pytest -q          # 50 testes de integração (BD real, recriada a cada execução)
+cd backend && createdb lumara_test && pytest -q          # 58 testes de integração (BD real, recriada a cada execução)
 cd frontend && npm test && npm run build                 # testes unitários + verificação de tipos + build
-# Ponta-a-ponta (API com dados DEMO em :8000 e Vite em :5173; usa o Playwright instalado globalmente):
-NODE_PATH=$(npm root -g) node e2e/fluxo.mjs e2e/capturas
+# Ponta-a-ponta (API em :8000 e Vite em :5173; recria os dados DEMO e usa o Playwright instalado globalmente):
+./e2e/correr.sh e2e/capturas
 ```
 
 ## Inteligência artificial (assistente de marketing)

@@ -15,7 +15,8 @@ interface Dados { total: number; dias_atraso_alerta_ceo: number; data: string; s
   stock_critico: { id: string; nome: string; unidade: string; disponivel: string; stock_minimo: string; ruptura: boolean }[];
   lotes_expirados: { id: string; numero: string; artigo: string; validade: string; saldo: string; unidade: string }[];
   conteudos_aprovacao: { id: string; codigo: string; tema: string; plataforma: string; data_publicacao: string; responsavel: string }[];
-  campanhas_aprovacao: { id: string; nome: string; data_inicio: string; data_fim: string; responsavel: string }[] } }
+  campanhas_aprovacao: { id: string; nome: string; data_inicio: string; data_fim: string; responsavel: string }[];
+  encomendas_alerta: { id: string; codigo: string; cliente: string; motivo: string }[] } }
 
 export default function Excepcoes() {
   const toast = useToast();
@@ -69,7 +70,15 @@ export default function Excepcoes() {
         </Bloco>
         <BlocoOcc titulo="Reclamações" itens={s.reclamacoes} />
         <BlocoOcc titulo="Despesas fora do orçamento" itens={s.despesas_fora_orcamento} nota="Até à Fase 5 (Finanças), comunicadas como ocorrências." />
-        <BlocoOcc titulo="Encomendas problemáticas" itens={s.encomendas_problematicas} />
+        <Bloco titulo="Encomendas problemáticas" n={s.encomendas_alerta.length + s.encomendas_problematicas.length}>
+          {s.encomendas_alerta.length + s.encomendas_problematicas.length === 0 ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">
+              {s.encomendas_alerta.map((e, i) => <li key={e.id + i}><Link to="/vendas" className="block py-2 hover:underline">{e.codigo} · {e.cliente}
+                <span className="block text-xs text-alerta">{e.motivo}</span></Link></li>)}
+              {s.encomendas_problematicas.map((o) => <li key={o.id}><Link to="/ocorrencias" className="block py-2 hover:underline">O-{String(o.numero).padStart(4, "0")} · {o.titulo}
+                <span className="block text-xs text-terra-700">{o.reportada_por}</span></Link></li>)}
+            </ul>)}
+        </Bloco>
         <BlocoOcc titulo="Outras ocorrências" itens={s.outras_ocorrencias} />
         {s.desvios_metas.length > 0 && (
           <Bloco titulo="Desvios das metas" n={s.desvios_metas.length}>

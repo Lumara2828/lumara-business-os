@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import type { EstadoActual, Indicadores, ResumoExecutivo, Tarefa } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Carregando, ErroCaixa, EstadoBadge, Kpi, PrioridadeBadge, Seccao, Vazio } from "../components/ui";
-import { fData, fDataHora, fQtd, MESES, ROTULO_FUNCAO } from "../lib/formato";
+import { fData, fDataHora, fMoeda, fQtd, MESES, ROTULO_FUNCAO } from "../lib/formato";
 import { useDados } from "../lib/useDados";
 
 // Paleta validada (CVD/contraste) para as duas séries; o âmbar tem contraste < 3:1,
@@ -32,6 +32,16 @@ interface Executivo {
   stock: StockResumo;
   producao: { planeadas: number; em_curso: number; atrasadas: number; nao_conformidades_abertas: number };
   marketing: MarketingResumo;
+  vendas: VendasResumo;
+}
+
+interface IndV { facturacao_kz: string; recebido_kz: string; encomendas_entregues: number; encomendas_recebidas: number; clientes_compradoras: number; clientes_novas: number; ticket_medio_kz: string | null }
+interface VendasResumo { actual: IndV; anterior: IndV; top_produtos: { nome: string; unidade: string; quantidade: string; valor_kz: string }[];
+  encomendas_abertas: number; por_receber_kz: string; por_receber_atrasado: number }
+
+function VarKz({ a, b }: { a: string; b: string }) {
+  const d = Number(a) - Number(b);
+  return <span>Período anterior: {fMoeda(b)} {Number(b) || Number(a) ? <b className={d >= 0 ? "text-folha-600" : "text-alerta"}>({d >= 0 ? "+" : "−"}{fMoeda(Math.abs(d))})</b> : null}</span>;
 }
 
 interface MarketingResumo { planeados: number; publicados: number; execucao_pct: number | null; em_revisao: number; atrasados: number;
@@ -137,6 +147,16 @@ function PainelExecutivo() {
       </section>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi titulo="Facturação (entregues)" valor={fMoeda(d.vendas.actual.facturacao_kz)} detalhe={<VarKz a={d.vendas.actual.facturacao_kz} b={d.vendas.anterior.facturacao_kz} />} aoClicar={() => navegar("/vendas")} />
+        <Kpi titulo="Recebido" valor={fMoeda(d.vendas.actual.recebido_kz)} tom="bom" detalhe={<VarKz a={d.vendas.actual.recebido_kz} b={d.vendas.anterior.recebido_kz} />} />
+        <Kpi titulo="Encomendas / clientes" valor={`${d.vendas.actual.encomendas_entregues} / ${d.vendas.actual.clientes_compradoras}`}
+          detalhe={<>Valor médio {d.vendas.actual.ticket_medio_kz ? fMoeda(d.vendas.actual.ticket_medio_kz) : "—"} · {d.vendas.actual.clientes_novas} cliente(s) nova(s) · {d.vendas.encomendas_abertas} em aberto</>} />
+        <Kpi titulo="Por receber" valor={fMoeda(d.vendas.por_receber_kz)} tom={d.vendas.por_receber_atrasado ? "alerta" : Number(d.vendas.por_receber_kz) ? "aviso" : "bom"}
+          detalhe={d.vendas.por_receber_atrasado ? `${d.vendas.por_receber_atrasado} pagamento(s) em atraso` : "Sem atrasos de pagamento"} />
+      </div>
+      <p className="text-xs text-terra-700 -mt-3">Facturação = encomendas entregues; recebido = pagamentos registados. Despesas, resultado e margem do mês chegam com as Finanças (Fase 5).</p>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi titulo="Cumprimento de prazos" valor={actual.taxa_cumprimento === null ? "—" : `${actual.taxa_cumprimento}%`}
           tom={actual.taxa_cumprimento === null ? "neutro" : actual.taxa_cumprimento >= meta ? "bom" : "alerta"}
           detalhe={<><span>Meta: {meta}%</span><br /><Variacao actual={actual.taxa_cumprimento} anterior={anterior.taxa_cumprimento} sufixo="%" /></>} />
@@ -205,6 +225,10 @@ function PainelExecutivo() {
 
       <div className="grid lg:grid-cols-2 gap-4">
         <CartaoMarketing m={d.marketing} />
+        <Seccao titulo="Produtos mais vendidos (período)" accao={<Link to="/vendas" className="text-sm text-folha-700 hover:underline">Ver vendas</Link>}>
+          {!d.vendas.top_produtos.length ? <p className="text-sm text-terra-700">Sem vendas entregues no período.</p> :
+            <ol className="list-decimal pl-5 text-sm space-y-1">{d.vendas.top_produtos.map((p) => <li key={p.nome}>{p.nome.replace(/^\[DEMO\] /, "")} — {fQtd(p.quantidade, p.unidade)} · {fMoeda(p.valor_kz)}</li>)}</ol>}
+        </Seccao>
         <Seccao titulo="Próximos prazos (7 dias)" accao={<Link to="/tarefas" className="text-sm text-folha-700 hover:underline">Ver tarefas</Link>}>
           <ListaTarefas tarefas={d.proximos_prazos} vazio="Sem prazos nos próximos 7 dias." />
         </Seccao>
@@ -257,6 +281,7 @@ interface Pessoal {
   em_atraso: Tarefa[]; hoje: Tarefa[]; esta_semana: Tarefa[]; bloqueadas: Tarefa[]; aguardar_aprovacao: Tarefa[];
   stock: StockResumo | null;
   marketing: MarketingResumo | null;
+  encomendas: { id: string; codigo: string; cliente: string; estado: string; data_prevista: string | null; itens: string; atrasada: boolean }[] | null;
 }
 
 function PainelPessoal() {
@@ -284,6 +309,15 @@ function PainelPessoal() {
         <Seccao titulo="Em atraso"><ListaTarefas tarefas={d.em_atraso} vazio="Nada em atraso. Excelente!" /></Seccao>
         <Seccao titulo="Para hoje"><ListaTarefas tarefas={d.hoje} vazio="Sem prazos para hoje." /></Seccao>
         <Seccao titulo="Esta semana"><ListaTarefas tarefas={d.esta_semana} vazio="Sem prazos nos próximos dias." /></Seccao>
+        {d.encomendas && (
+          <Seccao titulo={`Encomendas em aberto (${d.encomendas.length})`} accao={<Link to="/vendas" className="text-sm text-folha-700 hover:underline">Abrir</Link>}>
+            {!d.encomendas.length ? <p className="text-sm text-terra-700">Sem encomendas por preparar.</p> : (
+              <ul className="divide-y divide-linho/60 text-sm">{d.encomendas.map((e) => (
+                <li key={e.id} className="py-2"><span className="font-medium">{e.codigo}</span> · {e.cliente} <span className="text-xs rounded-full bg-areia px-2">{e.estado.replace("_", " ")}</span>
+                  <p className="text-xs text-terra-700">{e.itens.replace(/\[DEMO\] /g, "")}{e.data_prevista ? <span className={e.atrasada ? "text-alerta font-medium" : ""}> · prevista {fData(e.data_prevista)}</span> : null}</p></li>))}</ul>
+            )}
+          </Seccao>
+        )}
         {d.stock && <CartaoStock s={d.stock} />}
         {d.marketing && <CartaoMarketing m={d.marketing} />}
         <Seccao titulo="À espera de alguém">

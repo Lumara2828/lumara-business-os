@@ -17,6 +17,9 @@ PADRAO: dict[str, dict] = {
     "dia_planeamento": {"valor": 0, "descricao": "Dia do planeamento semanal (0 = segunda-feira)"},
     "dia_revisao": {"valor": 4, "descricao": "Dia da revisão semanal (4 = sexta-feira)"},
     "dias_alerta_validade": {"valor": 30, "descricao": "Dias antes da validade para alertar sobre lotes em stock"},
+    "limite_desconto_pct": {"valor": 10, "descricao": "Desconto máximo (%) sem aprovação da CEO"},
+    "dias_cobranca": {"valor": 7, "descricao": "Dias após a entrega até alertar pagamento em falta"},
+    "dias_cliente_inactivo": {"valor": 90, "descricao": "Dias sem comprar para considerar uma cliente inactiva"},
     "moeda": {"valor": "AOA", "descricao": "Moeda base (Kwanza)"},
 }
 

@@ -160,7 +160,7 @@ def registar_entrada(db: Session, ctx: Contexto, artigo_id, d: DadosEntrada, *, 
 
 def registar_saida(db: Session, ctx: Contexto, artigo_id, quantidade: Decimal, *, tipo: str = "saida", lote_id=None,
                    motivo: str | None = None, referencia: str | None = None, ordem_id=None, data_movimento: date | None = None,
-                   is_demo: bool = False) -> list[Movimento]:
+                   is_demo: bool = False, encomenda_id=None) -> list[Movimento]:
     """Retira `quantidade` (positiva) do stock. Devolve os movimentos criados (um por lote)."""
     if tipo not in ("saida", "consumo", "perda"):
         raise ErroNegocio("tipo_invalido", "Tipo de saída inválido.")
@@ -204,7 +204,7 @@ def registar_saida(db: Session, ctx: Contexto, artigo_id, quantidade: Decimal, *
     for lid, qtd in partes:
         m = Movimento(artigo_id=artigo.id, lote_id=lid, tipo=tipo, quantidade=-qtd, custo_unitario=artigo.custo_unitario,
                       data_movimento=data_mov, motivo=motivo, referencia=referencia, ordem_producao_id=ordem_id,
-                      utilizador_id=ctx.utilizador.id, is_demo=is_demo)
+                      encomenda_id=encomenda_id, utilizador_id=ctx.utilizador.id, is_demo=is_demo)
         db.add(m)
         movimentos.append(m)
     db.flush()

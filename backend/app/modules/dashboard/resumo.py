@@ -41,7 +41,11 @@ def resumo_executivo(db: Session) -> dict:
                          "acompanhar."), "atencao"
     else:
         estado, nivel = f"Cumprimento abaixo da meta: {taxa}% no prazo (meta {meta}%), {act['em_atraso']} tarefa(s) em atraso.", "critico"
-    estado += " Indicadores comerciais e financeiros ficam disponíveis a partir das Fases 4 e 5."
+    from app.modules.vendas.router import indicadores
+    from app.modules.vendas.service import fkz
+    v = indicadores(db, ini, fim)
+    estado += (f" Vendas do mês: {v['encomendas_entregues']} encomenda(s) entregue(s), facturação {fkz(v['facturacao_kz'])}, "
+               f"recebido {fkz(v['recebido_kz'])}. Despesas e resultado ficam disponíveis com as Finanças (Fase 5).")
 
     # 2. O que está a correr bem?
     bem = []
@@ -67,6 +71,14 @@ def resumo_executivo(db: Session) -> dict:
         Movimento.tipo == "perda", Movimento.data_movimento >= ini).group_by(Movimento.artigo_id)).all()
     perdas = [f"{o.titulo} ({o.gravidade})" for o in ocorrencias if o.tipo in ("despesa_imprevista", "problema_producao",
                                                                                  "encomenda_problematica")]
+    from decimal import Decimal
+    from app.modules.vendas.router import por_receber
+    from app.modules.vendas.service import fkz as fkz_
+    pr = por_receber(db)
+    atrasadas_cob = [i for i in pr["itens"] if i["atrasado"]]
+    if atrasadas_cob:
+        perdas.append(f"{len(atrasadas_cob)} encomenda(s) entregue(s) com pagamento em atraso: "
+                      f"{fkz_(sum(Decimal(i['em_divida_kz']) for i in atrasadas_cob))} por receber")
     from app.modules.stock.models import Artigo as _Artigo
     for aid, q in perdas_stock:
         a = db.get(_Artigo, aid)
@@ -92,6 +104,10 @@ def resumo_executivo(db: Session) -> dict:
     n_camp = db.scalar(select(func.count()).where(Campanha.estado == "proposta")) or 0
     if n_camp:
         intervencao.append(f"{n_camp} campanha(s) proposta(s) a aguardar decisão.")
+    from app.modules.vendas.models import Encomenda
+    n_desc = db.scalar(select(func.count()).where(Encomenda.desconto_requer_aprovacao.is_(True), Encomenda.estado != "cancelada")) or 0
+    if n_desc:
+        intervencao.append(f"{n_desc} encomenda(s) com desconto acima do limite a aprovar.")
     from app.modules.stock import service as stock
     for a, q in stock.abaixo_minimo(db):
         if q <= 0:

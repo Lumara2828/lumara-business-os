@@ -17,8 +17,9 @@ notificações, registo de actividade, configuração), nunca por cópia de dado
 │  ├─ Fase 1: auth · equipa · tarefas · notificações · ocorrências · responsabilidades · rotina  │
 │  │          dashboard/excepções · auditoria · configuração · Fase 2: stock · produção     │
 │  │          Fase 3: marketing · campanhas · IA (adaptador) · integrações (declaradas)            │
+│  │          Fase 4: vendas · clientes · pagamentos · eventos e feiras                          │
 │  ├─ automação: verificação idempotente de alertas (pedido, botão da CEO ou cron)              │
-│  └─ (futuro) vendas · eventos · finanças · procedimentos · automação avançada                │
+│  └─ (futuro) finanças · procedimentos · automação avançada                                   │
 └──────────────────────────────────────────┬─────────────────────────────────────────────────────┘
                                            │ SQLAlchemy 2 · migrações Alembic
 ┌──────────────────────────────────────────▼─────────────────────────────────────────────────────┐
@@ -127,4 +128,4 @@ flowchart LR
 ```
 
 Legenda: setas contínuas = fluxo de dados implementado ou planeado com regra de negócio; tracejado = referência/sugestão.
-Activo: Fase 1 (Núcleo, Tarefas, Dashboard, Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal) Fase 2 (Produção, Stock e Inventário) e Fase 3 (Marketing, Campanhas, Assistente de IA).
+Activo: Fase 1 (Núcleo, Tarefas, Dashboard, Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal) Fase 2 (Produção, Stock e Inventário) Fase 3 (Marketing, Campanhas, Assistente de IA) e Fase 4 (Vendas, Clientes, Eventos).

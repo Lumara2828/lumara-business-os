@@ -31,8 +31,8 @@ MODULOS = [
     {"modulo": "Stock e Inventário", "fase": 2, "estado": "activo"},
     {"modulo": "Marketing e Conteúdos com IA", "fase": 3, "estado": "activo"},
     {"modulo": "Campanhas", "fase": 3, "estado": "activo"},
-    {"modulo": "Eventos e feiras", "fase": 4, "estado": "planeado"},
-    {"modulo": "Vendas e Clientes", "fase": 4, "estado": "planeado"},
+    {"modulo": "Eventos e feiras", "fase": 4, "estado": "activo"},
+    {"modulo": "Vendas e Clientes", "fase": 4, "estado": "activo"},
     {"modulo": "Finanças e Rentabilidade", "fase": 5, "estado": "planeado"},
     {"modulo": "Procedimentos e Documentação", "fase": 5, "estado": "planeado"},
     {"modulo": "IA e Automação avançada", "fase": 6, "estado": "planeado"},
@@ -65,9 +65,44 @@ def executivo(
         "stock": _stock_resumo(db),
         "producao": producao_svc.estado_producao(db),
         "marketing": _marketing_resumo(db, ini, fim),
+        "vendas": _vendas_resumo(db, ini, fim, ini_ant, fim_ant),
         "modulos": MODULOS,
         "gerado_em": agora(),
     }
+
+
+def _vendas_resumo(db: Session, ini, fim, ini_ant, fim_ant) -> dict:
+    from app.modules.vendas.models import Encomenda, LinhaEncomenda
+    from app.modules.vendas.router import indicadores, por_receber
+    from app.modules.stock.models import Artigo
+    de_ent = func.date(func.timezone("Africa/Luanda", Encomenda.entregue_em))
+    top = db.execute(select(Artigo.nome, Artigo.unidade, func.sum(LinhaEncomenda.quantidade), func.sum(LinhaEncomenda.total_kz))
+                     .join(LinhaEncomenda, LinhaEncomenda.artigo_id == Artigo.id).join(Encomenda)
+                     .where(Encomenda.estado == "entregue", de_ent >= ini, de_ent <= fim)
+                     .group_by(Artigo.id).order_by(func.sum(LinhaEncomenda.total_kz).desc()).limit(5)).all()
+    abertas = db.scalar(select(func.count()).where(Encomenda.estado.in_(("recebida", "em_preparacao", "pronta")))) or 0
+    pr = por_receber(db)
+    return {"actual": indicadores(db, ini, fim), "anterior": indicadores(db, ini_ant, fim_ant),
+            "top_produtos": [{"nome": n, "unidade": u, "quantidade": str(q), "valor_kz": str(v)} for n, u, q, v in top],
+            "encomendas_abertas": abertas, "por_receber_kz": pr["total_kz"],
+            "por_receber_atrasado": sum(1 for i in pr["itens"] if i["atrasado"])}
+
+
+def _encomendas_problema(db: Session) -> list[dict]:
+    from app.modules.vendas.models import Encomenda
+    from app.modules.vendas.router import por_receber
+    res = []
+    for e in db.scalars(select(Encomenda).where(Encomenda.estado.in_(("recebida", "em_preparacao", "pronta")))).unique():
+        if e.desconto_requer_aprovacao:
+            res.append({"id": str(e.id), "codigo": f"E-{e.numero:04d}", "cliente": e.cliente.nome, "motivo": "Desconto acima do limite a aprovar"})
+        elif e.data_prevista and e.data_prevista < hoje():
+            res.append({"id": str(e.id), "codigo": f"E-{e.numero:04d}", "cliente": e.cliente.nome,
+                        "motivo": f"Entrega atrasada (prevista {formatar_data(e.data_prevista)})"})
+    for i in por_receber(db)["itens"]:
+        if i["atrasado"]:
+            res.append({"id": str(i["id"]), "codigo": i["codigo"], "cliente": i["cliente"],
+                        "motivo": f"Pagamento em falta há {i['dias']} dias ({i['em_divida_kz']} Kz)"})
+    return res
 
 
 def _marketing_resumo(db: Session, ini, fim) -> dict:
@@ -120,7 +155,19 @@ def pessoal(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_
         "aguardar_aprovacao": [tarefas.para_saida(ctx, t) for t in minhas if t.estado == "aguardar_aprovacao"],
         "stock": _stock_resumo(db) if ctx.pode(P.STOCK_MOVIMENTAR) else None,
         "marketing": _marketing_resumo(db, ini, fim) if ctx.pode(P.MARKETING_CALENDARIO) else None,
+        "encomendas": _encomendas_pessoal(db, ctx),
     }
+
+
+def _encomendas_pessoal(db: Session, ctx: Contexto) -> list[dict] | None:
+    from app.modules.vendas.models import Encomenda
+    if not (ctx.pode(P.ENCOMENDAS_PREPARAR) or ctx.pode(P.VENDAS_GERIR)) or ctx.pode(P.DASHBOARD_EXECUTIVO):
+        return None
+    lista = db.scalars(select(Encomenda).where(Encomenda.estado.in_(("recebida", "em_preparacao", "pronta")))
+                       .order_by(Encomenda.data_prevista.asc().nulls_last())).unique().all()
+    return [{"id": str(e.id), "codigo": f"E-{e.numero:04d}", "cliente": e.cliente.nome, "estado": e.estado, "data_prevista": e.data_prevista,
+             "itens": ", ".join(f"{l.quantidade.normalize():f} × {l.artigo.nome}" for l in e.linhas),
+             "atrasada": bool(e.data_prevista and e.data_prevista < hoje())} for e in lista]
 
 
 def _conteudos_revisao(db: Session) -> list[dict]:
@@ -184,6 +231,7 @@ def excepcoes(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = De
         "reclamacoes": occ({"reclamacao_cliente"}),
         "despesas_fora_orcamento": occ({"despesa_imprevista"}),
         "encomendas_problematicas": occ({"encomenda_problematica"}),
+        "encomendas_alerta": _encomendas_problema(db),
         "outras_ocorrencias": occ({"outro"}),
         "desvios_metas": desvios,
         "conteudos_aprovacao": _conteudos_revisao(db),

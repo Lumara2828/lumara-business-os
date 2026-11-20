@@ -11,3 +11,5 @@ from app.modules.tarefas.models import AnexoTarefa, CategoriaTarefa, ComentarioT
 from app.modules.producao.models import FichaIngrediente, FichaTecnica, NaoConformidade, OrdemProducao  # noqa: F401,E402
 from app.modules.stock.models import Artigo, Fornecedor, Lote, Movimento  # noqa: F401,E402
 from app.modules.marketing.models import Campanha, ComentarioConteudo, Conteudo, InteracaoIA, MediaConteudo  # noqa: F401,E402
+from app.modules.eventos.models import Evento, EventoCusto, EventoProduto, EventoTarefa  # noqa: F401,E402
+from app.modules.vendas.models import Cliente, Encomenda, LinhaEncomenda, Pagamento, Preco  # noqa: F401,E402

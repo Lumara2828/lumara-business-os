@@ -101,6 +101,7 @@ class Movimento(Base):
     motivo: Mapped[str | None] = mapped_column(Text)
     referencia: Mapped[str | None] = mapped_column(String(80))  # ex.: OP-0003, n.º de factura
     ordem_producao_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ordens_producao.id"), index=True)
+    encomenda_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("encomendas.id"), index=True)
     utilizador_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"), nullable=False)
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     criado_em: Mapped[datetime] = criado_em()

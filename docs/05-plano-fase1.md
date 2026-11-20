@@ -81,5 +81,31 @@ Suposições da Fase 3:
 - Métricas são registadas à mão até às integrações da Fase 6.
 - Eventos e feiras (com produtos a levar, checklist e rentabilidade) passam para a Fase 4, porque a rentabilidade depende das vendas.
 
+## Fase 4 — Vendas, Clientes e Eventos (implementada)
+
+| # | Entrega | Estado |
+|---|---|---|
+| 1 | CRM: clientes (contactos, WhatsApp, localidade, origem, preferências, observações, consentimento de marketing), histórico, primeira/última compra, produtos preferidos, clientes inactivas | ✅ |
+| 2 | Preços de venda com histórico (só a CEO altera); margem bruta visível só à CEO | ✅ |
+| 3 | Encomendas: produtos, quantidades, preços (fotografia), descontos, entrega, total; estados recebida → em preparação → pronta → entregue / cancelada | ✅ |
+| 4 | Desconto acima do limite (10%, configurável) exige aprovação da CEO | ✅ |
+| 5 | «Pronta» verifica stock disponível descontando reservas; «entregue» dá saída FEFO por lote, ligada à encomenda (rastreabilidade até à cliente) | ✅ |
+| 6 | Pagamentos imutáveis (estorno com motivo); facturação ≠ recebido; contas a receber | ✅ |
+| 7 | Venda rápida (balcão/feira): regista, entrega e recebe numa operação | ✅ |
+| 8 | Mensagem de WhatsApp preparada (ligação wa.me — a pessoa revê e envia; sem API) | ✅ |
+| 9 | Relatórios: vendas por dia/semana/mês, produtos mais vendidos, valor médio, clientes recorrentes, por canal | ✅ |
+| 10 | Eventos/feiras: produtos a levar, checklist, vendas no evento, reconciliação levado/vendido/devolvido, custos e rentabilidade (CEO) | ✅ |
+| 11 | Dashboard (facturação, recebido, encomendas, clientes, por receber, mais vendidos), excepções e alertas (entregas, cobranças) | ✅ |
+| 12 | Diana prepara encomendas sem ver valores; Maira gere vendas sem ver custos/margens | ✅ |
+| 13 | Testes: +8 de integração (58 no total) e fluxo ponta-a-ponta (encomenda → preparação → entrega → pagamento; venda em feira) | ✅ |
+
+Suposições da Fase 4:
+- O stock sai na **entrega** (não na encomenda); a encomenda «pronta» reserva stock.
+- Encomendas entregues não se cancelam (devoluções ficam para a Fase 5).
+- Facturação conta pela data de entrega; recebimento pela data do pagamento.
+- Rentabilidade de eventos usa o custo médio actual dos produtos (materiais); mão-de-obra e despesas gerais entram na Fase 5.
+- Os preços DEMO são fictícios e marcados como tal.
+- Os relatórios de vendas (sem custos) são visíveis à Maira, que gere as vendas; custos, margens e orçamentos só à CEO.
+
 ## Próximas fases (resumo)
-- **Fase 4** Vendas e CRM, eventos e feiras; **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.
+ **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.

@@ -94,3 +94,22 @@ export interface Conteudo { id: string; numero: number; codigo: string; data_pub
 export interface Campanha { id: string; nome: string; objectivo: string; publico_alvo: string | null; mensagem_chave: string | null;
   canais: string[]; data_inicio: string; data_fim: string; estado: string; responsavel: { id: string; nome: string };
   aprovada_em: string | null; resultados: string | null; conteudos: number; conteudos_publicados: number; is_demo: boolean; orcamento_kz: string | null }
+
+// --- Fase 4: vendas e eventos ---
+export interface ClienteV { id: string; nome: string; telefone: string | null; whatsapp: string | null; email: string | null; localidade: string | null;
+  morada: string | null; origem: string | null; preferencias: string | null; observacoes: string | null; consentimento_marketing: boolean;
+  consentimento_em: string | null; activo: boolean; is_demo: boolean; criado_em: string; compras: number; primeira_compra: string | null;
+  ultima_compra: string | null; total_compras_kz: string | null; recorrente: boolean;
+  encomendas?: EncomendaV[]; produtos_preferidos?: { produto: string; quantidade: string }[] }
+export interface EncomendaV { id: string; numero: number; codigo: string; estado: "recebida" | "em_preparacao" | "pronta" | "entregue" | "cancelada";
+  estado_rotulo: string; cliente: { id: string; nome: string; whatsapp: string | null }; data_encomenda: string; canal: string; evento_id: string | null;
+  tipo_entrega: string; morada_entrega: string | null; data_prevista: string | null; entregue_em: string | null; atrasada: boolean; notas: string | null;
+  motivo_cancelamento: string | null; responsavel: { id: string; nome: string }; desconto_requer_aprovacao: boolean; versao: number; is_demo: boolean;
+  linhas: { artigo: { id: string; nome: string; unidade: string }; quantidade: string; preco_unitario_kz?: string; desconto_kz?: string; total_kz?: string }[];
+  forma_pagamento?: string | null; subtotal_kz?: string; desconto_kz?: string; taxa_entrega_kz?: string; total_kz?: string; pago_kz?: string;
+  em_divida_kz?: string; estado_pagamento?: string;
+  disponibilidade?: { artigo: string; unidade: string; necessario: string; disponivel: string; falta: string }[];
+  pagamentos?: { id: number; valor_kz: string; data_pagamento: string; forma: string; referencia: string | null; motivo: string | null; registado_por: string }[];
+  lotes_entregues?: { artigo: string; lote: string | null; quantidade: string; validade: string | null }[] }
+export interface PrecoV { artigo: { id: string; codigo: string; nome: string; unidade: string; is_demo: boolean }; preco_kz: string | null;
+  disponivel: string; custo_unitario: string | null; margem_bruta_pct: string | null }

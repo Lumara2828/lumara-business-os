@@ -5,6 +5,7 @@ import { Carregando } from "./components/ui";
 import Auditoria from "./pages/Auditoria";
 import Definicoes from "./pages/Definicoes";
 import Equipa from "./pages/Equipa";
+import Eventos from "./pages/Eventos";
 import Excepcoes from "./pages/Excepcoes";
 import Login from "./pages/Login";
 import Marketing from "./pages/Marketing";
@@ -16,6 +17,7 @@ import Responsabilidades from "./pages/Responsabilidades";
 import Rotina from "./pages/Rotina";
 import Stock from "./pages/Stock";
 import Tarefas from "./pages/Tarefas";
+import Vendas from "./pages/Vendas";
 
 function Protegida({ permissao, children }: { permissao: string; children: React.ReactNode }) {
   const { pode } = useAuth();
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="tarefas" element={<Tarefas />} />
         <Route path="excepcoes" element={<Protegida permissao="excepcoes.ver"><Excepcoes /></Protegida>} />
         <Route path="rotina" element={<Protegida permissao="relatorios.equipa"><Rotina /></Protegida>} />
+        <Route path="vendas" element={<Vendas />} />
+        <Route path="eventos" element={<Protegida permissao="eventos.ver"><Eventos /></Protegida>} />
         <Route path="marketing" element={<Protegida permissao="marketing.calendario"><Marketing /></Protegida>} />
         <Route path="producao" element={<Protegida permissao="stock.ver"><Producao /></Protegida>} />
         <Route path="stock" element={<Protegida permissao="stock.ver"><Stock /></Protegida>} />

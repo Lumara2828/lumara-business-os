@@ -41,6 +41,15 @@ Fonte de verdade: `backend/app/core/permissions.py` (testada em `tests/test_perm
 | Aprovar conteúdos e campanhas | ● | | |
 | Editar o guia de marca e as expressões proibidas | ● | | |
 | Orçamento das campanhas | ● | ✖ | ✖ |
+| **Fase 4 — Vendas, Clientes e Eventos** | | | |
+| Clientes, encomendas, pagamentos, venda rápida | ● | ● | |
+| Relatórios de vendas (facturação, recebido, mais vendidos) | ● | ● | |
+| Ver encomendas (sem valores) e prepará-las/entregá-las | ● | ● | ● |
+| Definir preços; aprovar descontos acima do limite | ● | | |
+| Margem bruta, custos, orçamento e rentabilidade de eventos | ● | ✖ | ✖ |
+| Ver eventos; marcar itens da checklist atribuídos | ● | ● | ● |
+| Criar/gerir eventos | ● | ● | |
+| Registar quantidades levadas/devolvidas num evento | ● | ● | ● |
 | **Fases seguintes (já declaradas)** | | | |
 | Vendas e clientes (CRM) | ● | ● | |
 | **Dados financeiros confidenciais** | ● | ✖ | ✖ |

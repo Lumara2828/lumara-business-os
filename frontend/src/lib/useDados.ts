@@ -8,16 +8,23 @@ export function useDados<T>(carregar: () => Promise<T>, deps: unknown[] = []) {
   const [aCarregar, setACarregar] = useState(true);
   const ref = useRef(carregar);
   ref.current = carregar;
+  // Só a resposta do pedido mais recente é aplicada: se o utilizador mudar um filtro
+  // enquanto um pedido anterior ainda decorre, a resposta antiga é descartada.
+  const ultimo = useRef(0);
 
   const recarregar = useCallback(async () => {
+    const n = ++ultimo.current;
     setACarregar(true);
     try {
-      setDados(await ref.current());
+      const r = await ref.current();
+      if (n !== ultimo.current) return;
+      setDados(r);
       setErro(null);
     } catch (e) {
+      if (n !== ultimo.current) return;
       setErro(e instanceof ErroApi ? e.message : "Erro ao carregar dados.");
     } finally {
-      setACarregar(false);
+      if (n === ultimo.current) setACarregar(false);
     }
   }, []);
 

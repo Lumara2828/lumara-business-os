@@ -48,8 +48,13 @@ class P(StrEnum):
     # --- Fase 3: marketing e IA ---
     MARKETING_CALENDARIO = "marketing.calendario"      # calendário, campanhas, assistente de IA
     MARKETING_APROVAR = "marketing.aprovar_publicacao"  # aprovação humana obrigatória antes de agendar/publicar
+    # --- Fase 4: vendas, clientes e eventos ---
+    VENDAS_GERIR = "vendas.gerir"                  # clientes, encomendas, pagamentos
+    VENDAS_RELATORIOS = "vendas.relatorios"        # facturação, recebimentos, produtos mais vendidos
+    ENCOMENDAS_PREPARAR = "encomendas.preparar"    # ver encomendas (sem valores) e prepará-las
+    EVENTOS_VER = "eventos.ver"
+    EVENTOS_GERIR = "eventos.gerir"
     # --- Fases seguintes (declaradas, sem endpoints ainda) ---
-    VENDAS_GERIR = "vendas.gerir"
     FINANCAS_VER = "financas.ver"
     FINANCAS_APROVAR_DESPESAS = "financas.aprovar_despesas"
     PRECOS_ALTERAR = "precos.alterar"
@@ -64,13 +69,14 @@ _COMUNS = {
     P.RESPONSABILIDADES_VER,
     P.PROCEDIMENTOS_VER,
     P.STOCK_VER,
+    P.EVENTOS_VER,
 }
 
 MATRIZ: dict[Funcao, frozenset[P]] = {
     Funcao.CEO: frozenset(P),
-    Funcao.MARKETING: frozenset(_COMUNS | {P.MARKETING_CALENDARIO, P.VENDAS_GERIR}),
+    Funcao.MARKETING: frozenset(_COMUNS | {P.MARKETING_CALENDARIO, P.VENDAS_GERIR, P.VENDAS_RELATORIOS, P.EVENTOS_GERIR}),
     Funcao.PRODUCAO: frozenset(
-        _COMUNS | {P.PRODUCAO_ORDENS, P.PRODUCAO_FICHAS_TECNICAS, P.STOCK_MOVIMENTAR}
+        _COMUNS | {P.PRODUCAO_ORDENS, P.PRODUCAO_FICHAS_TECNICAS, P.STOCK_MOVIMENTAR, P.ENCOMENDAS_PREPARAR}
     ),
 }
 
