@@ -24,6 +24,9 @@ const ICONES: Record<string, string> = {
   equipa: "M8 11a3 3 0 100-6 3 3 0 000 6zM16 11a3 3 0 100-6M2 20c0-3 3-5 6-5s6 2 6 5M16 15c3 0 6 2 6 5",
   auditoria: "M6 3h9l4 4v14H6zM9 12h7M9 16h7",
   definicoes: "M12 15a3 3 0 100-6 3 3 0 000 6zM4 12h2M18 12h2M12 4v2M12 18v2",
+  assistente: "M4 5h16v11H9l-5 4zM8 9h8M8 12h5",
+  relatorio: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h3",
+  automacoes: "M13 3L5 13h6l-1 8 8-10h-6z",
 };
 
 function Icone({ nome }: { nome: string }) {
@@ -32,7 +35,7 @@ function Icone({ nome }: { nome: string }) {
 }
 
 const PROXIMAS = [
-  ["Fase 6", "Automação avançada e integrações"],
+  ["Fase 6", "Integrações externas (quando houver credenciais)"],
 ];
 
 export default function Layout() {
@@ -44,6 +47,7 @@ export default function Layout() {
   const itens = [
     { a: "/", n: "Painel", i: "painel" },
     { a: "/tarefas", n: "Tarefas", i: "tarefas" },
+    { a: "/assistente", n: "Assistente", i: "assistente" },
     pode("excepcoes.ver") && { a: "/excepcoes", n: "Central de Excepções", i: "excepcoes" },
     pode("relatorios.equipa") && { a: "/rotina", n: "Rotina semanal", i: "rotina" },
     (pode("vendas.gerir") || pode("encomendas.preparar")) && { a: "/vendas", n: pode("vendas.gerir") ? "Vendas e clientes" : "Encomendas", i: "vendas" },
@@ -58,6 +62,8 @@ export default function Layout() {
     { a: "/notificacoes", n: "Notificações", i: "notificacoes" },
   ].filter(Boolean) as { a: string; n: string; i: string }[];
   const gestao = [
+    pode("dashboard.executivo") && pode("financas.ver") && { a: "/relatorio", n: "Relatório mensal", i: "relatorio" },
+    pode("configuracao.gerir") && { a: "/automacoes", n: "Automações", i: "automacoes" },
     pode("equipa.gerir") && { a: "/equipa", n: "Equipa", i: "equipa" },
     pode("auditoria.ver") && { a: "/auditoria", n: "Registo de actividade", i: "auditoria" },
     { a: "/definicoes", n: "Definições", i: "definicoes" },

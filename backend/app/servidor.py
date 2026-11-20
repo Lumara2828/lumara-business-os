@@ -4,14 +4,26 @@ site (ex.: /tarefas) devolve o index.html para a navegação funcionar ao recarr
 import os
 from pathlib import Path
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.main import app as api
+from app.modules.automacao import agendador
 
 DIST = Path(os.environ.get("FRONTEND_DIST", "/app/frontend_dist")).resolve()
 
-raiz = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+@asynccontextmanager
+async def ciclo_de_vida(_app):
+    # Automações internas em segundo plano (alertas, resumo semanal, relatório mensal).
+    if os.environ.get("AUTOMACOES_EM_FUNDO", "1") == "1":
+        agendador.iniciar_ciclo()
+    yield
+    agendador.parar_ciclo()
+
+
+raiz = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=ciclo_de_vida)
 raiz.mount("/api", api)
 
 

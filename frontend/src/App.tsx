@@ -2,7 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import { Carregando } from "./components/ui";
+import Assistente from "./pages/Assistente";
 import Auditoria from "./pages/Auditoria";
+import Automacoes from "./pages/Automacoes";
 import Definicoes from "./pages/Definicoes";
 import Equipa from "./pages/Equipa";
 import Eventos from "./pages/Eventos";
@@ -15,6 +17,7 @@ import Ocorrencias from "./pages/Ocorrencias";
 import Painel from "./pages/Painel";
 import Procedimentos from "./pages/Procedimentos";
 import Producao from "./pages/Producao";
+import RelatorioMensal from "./pages/RelatorioMensal";
 import Responsabilidades from "./pages/Responsabilidades";
 import Rotina from "./pages/Rotina";
 import Stock from "./pages/Stock";
@@ -50,6 +53,9 @@ export default function App() {
         <Route path="equipa" element={<Protegida permissao="equipa.gerir"><Equipa /></Protegida>} />
         <Route path="auditoria" element={<Protegida permissao="auditoria.ver"><Auditoria /></Protegida>} />
         <Route path="definicoes" element={<Definicoes />} />
+        <Route path="assistente" element={<Assistente />} />
+        <Route path="relatorio" element={<Protegida permissao="financas.ver"><RelatorioMensal /></Protegida>} />
+        <Route path="automacoes" element={<Protegida permissao="configuracao.gerir"><Automacoes /></Protegida>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

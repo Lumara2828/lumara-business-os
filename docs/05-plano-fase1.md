@@ -131,5 +131,21 @@ Suposições da Fase 5:
 - Margens só são calculadas com custos completos; com custos em falta, o sistema mostra «incompleto» em vez de um número enganador.
 - Os dados DEMO não têm custos reais; a despesa DEMO é fictícia e está marcada.
 
-## Próximas fases (resumo)
-- **Fase 6** integrações (Instagram/Facebook, WhatsApp Business, Canva, Metricool, Make), assistente de gestão com IA sobre os dados autorizados, relatórios inteligentes e automações.
+## Fase 6 — Assistente de gestão, relatórios e automações (implementada; integrações por activar)
+
+| # | Entrega | Estado |
+|---|---|---|
+| 1 | 15 consultas de gestão determinísticas (tarefas, equipa, o que produzir, stock, validades, ordens, encomendas, clientes inactivas, cobranças, vendas, conteúdos, despesas por aprovar, resultado do mês), cada uma com as permissões da função | ✅ |
+| 2 | Assistente de gestão com IA (Claude, ciclo de ferramentas): o modelo só recebe as consultas autorizadas para quem pergunta; o servidor volta a verificar a permissão em cada pedido; resposta com as tabelas de origem por baixo | ✅ |
+| 3 | Sem chave de IA: a mesma página funciona por botões e por palavras-chave (sem simular respostas) | ✅ |
+| 4 | Relatório mensal da CEO: destaques por regras explícitas, tarefas, vendas, finanças, produção, stock, marketing e ocorrências, com mês anterior; imprimível em PDF | ✅ |
+| 5 | Automações internas em segundo plano (de 10 em 10 min, idempotentes, com trava na base de dados): alertas, resumo semanal à segunda-feira (pessoal e da equipa), aviso do relatório mensal; página «Automações» para ligar/desligar e executar | ✅ |
+| 6 | Registo de cada pergunta à IA (pessoa, consultas usadas, tokens) e no registo de actividade; limite por hora partilhado com o assistente de marketing | ✅ |
+| 7 | Testes: +10 de integração (75 no total) e ponta-a-ponta (assistente como Produção e CEO, relatório mensal, automações, bloqueio da Marketing) | ✅ |
+| 8 | Integrações externas (Instagram/Facebook, WhatsApp Business, Canva, Metricool, Make) | ⏳ à espera de credenciais e prioridade da CEO |
+
+Suposições da Fase 6:
+- **O que produzir** = stock mínimo + encomendas em aberto (recebidas e em preparação) − disponível (descontando encomendas prontas) − ordens planeadas ou em curso. Indica se há materiais pela ficha técnica activa.
+- **Cliente inactiva** = já comprou e não tem entregas há mais de `dias_cliente_inactivo` (90 por omissão).
+- O resumo semanal sai à segunda-feira a partir das 07:00 (Luanda); se o servidor estiver parado, sai na terça-feira. O aviso do relatório mensal sai na primeira semana do mês.
+- O assistente responde com os dados actuais; não guarda conversas nem tem memória entre perguntas.

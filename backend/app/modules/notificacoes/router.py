@@ -11,7 +11,7 @@ from app.core.errors import nao_encontrado
 from app.core.permissions import P
 from app.core.tempo import agora
 from app.dependencies import Contexto, contexto_actual, requer
-from app.modules.automacao import alertas
+from app.modules.automacao import agendador, alertas
 from app.modules.notificacoes.models import Notificacao
 
 router = APIRouter(prefix="/notificacoes", tags=["Notificações"])
@@ -35,7 +35,7 @@ class Resumo(BaseModel):
 
 @router.get("", response_model=Resumo)
 def listar(apenas_nao_lidas: bool = False, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
-    alertas.verificar_se_necessario(db)
+    agendador.executar_se_necessario(db)
     eu = ctx.utilizador.id
     q = select(Notificacao).where(Notificacao.utilizador_id == eu)
     if apenas_nao_lidas:

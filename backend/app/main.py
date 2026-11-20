@@ -17,7 +17,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.rate_limit import limiter
+from app.modules.assistente.router import router as assistente
 from app.modules.auditoria.router import router as auditoria
+from app.modules.automacao.router import router as automacoes
 from app.modules.auth.router import router as auth
 from app.modules.configuracao.router import router as configuracao
 from app.modules.dashboard.router import router as dashboard
@@ -31,6 +33,7 @@ from app.modules.notificacoes.router import router as notificacoes
 from app.modules.ocorrencias.router import router as ocorrencias
 from app.modules.responsabilidades.router import router as responsabilidades
 from app.modules.procedimentos.router import router as procedimentos
+from app.modules.relatorios.router import router as relatorios
 from app.modules.producao.router import router as producao
 from app.modules.rotina.router import router as rotina
 from app.modules.stock.router import router as stock
@@ -39,7 +42,7 @@ from app.modules.vendas.router import router as vendas
 
 log = logging.getLogger("lumara")
 
-app = FastAPI(title="Lumara Business OS — API", version="5.0.0-fase5",
+app = FastAPI(title="Lumara Business OS — API", version="6.0.0-fase6",
               docs_url="/docs" if settings.ambiente != "producao" else None, redoc_url=None)
 app.state.limiter = limiter
 app.add_middleware(CORSMiddleware, allow_origins=settings.lista_cors, allow_methods=["*"],
@@ -57,7 +60,7 @@ async def cabecalhos_seguranca(request: Request, call_next):
 
 
 for r in (auth, equipa, tarefas, notificacoes, ocorrencias, responsabilidades, rotina, dashboard, auditoria, configuracao,
-          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos):
+          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos, assistente, relatorios, automacoes):
     app.include_router(r)
 
 

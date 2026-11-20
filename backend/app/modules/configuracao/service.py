@@ -23,6 +23,8 @@ PADRAO: dict[str, dict] = {
     "custo_mao_obra_hora_kz": {"valor": None, "descricao": "Custo de mão-de-obra directa por hora (Kz) — para a ficha de custos"},
     "meta_facturacao_mensal_kz": {"valor": None, "descricao": "Meta de facturação mensal (Kz)"},
     "margem_minima_pct": {"valor": None, "descricao": "Margem bruta mínima por produto (%) — abaixo disto é assinalado"},
+    "automacao_resumo_semanal": {"valor": 1, "descricao": "Enviar o resumo semanal à segunda-feira (1 = sim, 0 = não)"},
+    "automacao_relatorio_mensal": {"valor": 1, "descricao": "Avisar a CEO do relatório mensal no início do mês (1 = sim, 0 = não)"},
     "moeda": {"valor": "AOA", "descricao": "Moeda base (Kwanza)"},
 }
 

@@ -278,6 +278,25 @@ await luisa.waitForSelector("text=Custo de mão-de-obra directa");
 await foto(luisa, "27-custos-produto");
 assert.equal(await maira.goto(`${BASE}/financas`).then(() => maira.locator("text=Finanças e rentabilidade").count()), 0, "Maira não vê as finanças");
 
+// --- Fase 6: assistente, relatório mensal, automações ---
+await diana.goto(`${BASE}/assistente`);
+await diana.click("text=O que devo produzir esta semana?");
+await diana.waitForSelector("section >> text=O que produzir");
+await foto(diana, "28-assistente-producao");
+assert.equal(await diana.locator("text=Resultado do mês").count(), 0, "Diana não tem consultas financeiras");
+await luisa.goto(`${BASE}/assistente`);
+await luisa.click("button:has-text('Clientes inactivas')");
+await luisa.waitForSelector("text=sem compras há mais de");
+await foto(luisa, "29-assistente-clientes");
+await luisa.click("nav >> text=Relatório mensal");
+await luisa.waitForSelector("text=Destaques");
+await foto(luisa, "30-relatorio-mensal");
+await luisa.click("nav >> text=Automações");
+await luisa.click("button:has-text('Executar agora')");
+await luisa.waitForSelector("text=Automações executadas.");
+await foto(luisa, "31-automacoes");
+assert.equal(await maira.goto(`${BASE}/relatorio`).then(() => maira.locator("text=Destaques").count()), 0, "Maira não vê o relatório mensal");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

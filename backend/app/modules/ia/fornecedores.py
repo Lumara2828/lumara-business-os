@@ -7,7 +7,7 @@ servidor (variável de ambiente) e nunca é enviada ao navegador.
 import json
 import logging
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol
 
 from app.core.config import settings
 from app.core.errors import ErroNegocio
@@ -25,6 +25,17 @@ class RespostaIA:
     motivo: str | None = None
 
 
+@dataclass
+class RespostaConversa:
+    texto: str | None
+    modelo: str
+    ferramentas_usadas: list[str]
+    tokens_entrada: int = 0
+    tokens_saida: int = 0
+    recusada: bool = False
+    motivo: str | None = None
+
+
 class FornecedorIA(Protocol):
     nome: str
     modelo: str
@@ -33,6 +44,9 @@ class FornecedorIA(Protocol):
 
     def gerar(self, sistema: str, pedido: str, esquema: dict) -> RespostaIA: ...
 
+    def conversar(self, sistema: str, pergunta: str, ferramentas: list[dict],
+                  executar: Callable[[str, dict], str], max_voltas: int = 6) -> RespostaConversa: ...
+
 
 class SemFornecedor:
     nome = "nenhum"
@@ -40,6 +54,9 @@ class SemFornecedor:
 
     def configurado(self) -> bool:
         return False
+
+    def conversar(self, sistema, pergunta, ferramentas, executar, max_voltas=6) -> RespostaConversa:
+        return self.gerar(sistema, pergunta, {})  # levanta ia_nao_configurada
 
     def gerar(self, sistema: str, pedido: str, esquema: dict) -> RespostaIA:
         raise ErroNegocio("ia_nao_configurada", "O assistente de IA não está configurado: falta a chave de API no servidor "
@@ -69,22 +86,12 @@ class AnthropicFornecedor:
             self._cliente = anthropic.Anthropic(api_key=self._api_key, timeout=120, max_retries=2)
         return self._cliente
 
-    def gerar(self, sistema: str, pedido: str, esquema: dict) -> RespostaIA:
+    def _pedir(self, params: dict):
         import anthropic
-        if not self.configurado():
-            return SemFornecedor().gerar(sistema, pedido, esquema)
-        params = dict(
-            model=self.modelo,
-            max_tokens=16000,
-            # O prompt de sistema (guia de marca) é estável: fica em cache entre pedidos.
-            system=[{"type": "text", "text": sistema, "cache_control": {"type": "ephemeral"}}],
-            output_config={"effort": self.esforco, "format": {"type": "json_schema", "schema": esquema}},
-            messages=[{"role": "user", "content": pedido}],
-        )
         if self.modelo in _COM_FALLBACK:
-            params.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+            params = {**params, "betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
         try:
-            r = self._client().beta.messages.create(**params)
+            return self._client().beta.messages.create(**params)
         except anthropic.AuthenticationError as e:
             log.error("IA: chave inválida (%s)", getattr(e, "request_id", ""))
             raise ErroNegocio("ia_chave_invalida", "A chave de API da IA é inválida. Contacte a administração.", 503) from e
@@ -99,6 +106,60 @@ class AnthropicFornecedor:
         except anthropic.APIConnectionError as e:
             raise ErroNegocio("ia_sem_ligacao", "Sem ligação ao serviço de IA.", 503) from e
 
+    def conversar(self, sistema: str, pergunta: str, ferramentas: list[dict],
+                  executar: Callable[[str, dict], str], max_voltas: int = 6) -> RespostaConversa:
+        """Ciclo de ferramentas: o modelo pede consultas, o servidor executa-as (com as
+        permissões de quem pergunta) e devolve os resultados, até haver uma resposta final."""
+        if not self.configurado():
+            return SemFornecedor().conversar(sistema, pergunta, ferramentas, executar)
+        mensagens: list = [{"role": "user", "content": pergunta}]
+        usadas: list[str] = []
+        t_in = t_out = 0
+        modelo = self.modelo
+        for _ in range(max_voltas):
+            r = self._pedir(dict(
+                model=self.modelo, max_tokens=16000,
+                system=[{"type": "text", "text": sistema, "cache_control": {"type": "ephemeral"}}],
+                output_config={"effort": self.esforco},
+                tools=ferramentas, messages=mensagens,
+            ))
+            uso = getattr(r, "usage", None)
+            t_in += getattr(uso, "input_tokens", 0) or 0
+            t_out += getattr(uso, "output_tokens", 0) or 0
+            modelo = r.model
+            if r.stop_reason == "refusal":
+                motivo = getattr(getattr(r, "stop_details", None), "explanation", None)
+                return RespostaConversa(None, modelo, usadas, t_in, t_out, True, motivo or "Pedido recusado pelo modelo.")
+            if r.stop_reason == "max_tokens":
+                raise ErroNegocio("ia_resposta_longa", "A resposta da IA ficou incompleta. Faça uma pergunta mais concreta.", 502)
+            pedidos = [b for b in r.content if b.type == "tool_use"]
+            if r.stop_reason != "tool_use" or not pedidos:
+                texto = "\n".join(b.text for b in r.content if b.type == "text").strip()
+                return RespostaConversa(texto or None, modelo, usadas, t_in, t_out)
+            # Mantém o conteúdo devolvido tal como veio (inclui blocos de raciocínio).
+            mensagens.append({"role": "assistant", "content": r.content})
+            resultados = []
+            for b in pedidos:
+                usadas.append(b.name)
+                try:
+                    resultados.append({"type": "tool_result", "tool_use_id": b.id, "content": executar(b.name, b.input or {})})
+                except ErroNegocio as e:
+                    resultados.append({"type": "tool_result", "tool_use_id": b.id, "content": e.detail["mensagem"], "is_error": True})
+            mensagens.append({"role": "user", "content": resultados})
+        raise ErroNegocio("ia_demasiados_passos", "A pergunta exigiu demasiadas consultas. Divida-a em perguntas mais simples.", 422)
+
+    def gerar(self, sistema: str, pedido: str, esquema: dict) -> RespostaIA:
+        if not self.configurado():
+            return SemFornecedor().gerar(sistema, pedido, esquema)
+        params = dict(
+            model=self.modelo,
+            max_tokens=16000,
+            # O prompt de sistema (guia de marca) é estável: fica em cache entre pedidos.
+            system=[{"type": "text", "text": sistema, "cache_control": {"type": "ephemeral"}}],
+            output_config={"effort": self.esforco, "format": {"type": "json_schema", "schema": esquema}},
+            messages=[{"role": "user", "content": pedido}],
+        )
+        r = self._pedir(params)
         uso = getattr(r, "usage", None)
         base = dict(modelo=r.model, tokens_entrada=getattr(uso, "input_tokens", None), tokens_saida=getattr(uso, "output_tokens", None))
         if r.stop_reason == "refusal":

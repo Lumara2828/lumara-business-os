@@ -24,6 +24,8 @@ LIMITES = {
     "margem_minima_pct": (0, 100),
     "dia_planeamento": (0, 6),
     "dia_revisao": (0, 6),
+    "automacao_resumo_semanal": (0, 1),
+    "automacao_relatorio_mensal": (0, 1),
 }
 
 

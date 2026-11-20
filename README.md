@@ -53,7 +53,7 @@ Depois, na app, a CEO cria as contas da Maira e da Diana em **Equipa** (palavra-
 
 ## Testes
 ```bash
-cd backend && createdb lumara_test && pytest -q          # 65 testes de integração (BD real, recriada a cada execução)
+cd backend && createdb lumara_test && pytest -q          # 75 testes de integração (BD real, recriada a cada execução)
 cd frontend && npm test && npm run build                 # testes unitários + verificação de tipos + build
 # Ponta-a-ponta (API em :8000 e Vite em :5173; recria os dados DEMO e usa o Playwright instalado globalmente):
 ./e2e/correr.sh e2e/capturas
@@ -73,9 +73,17 @@ Sem chave, o assistente responde «não configurado» — nunca simula sugestõe
 não grava, não aprova e não publica. Cada pedido fica registado (utilizadora, modelo, tokens) e há
 um limite por utilizadora (`IA_LIMITE_PEDIDOS_HORA`).
 
+### Assistente de gestão (Fase 6)
+Menu **Assistente**: perguntas como «que tarefas estão atrasadas?» ou «o que devo produzir esta semana?».
+Com a chave configurada, o Claude responde usando só as consultas que a função de quem pergunta pode ver
+(`backend/app/modules/assistente/consultas.py`); sem chave, a pergunta abre a consulta correspondente.
+
 ## Operação
-- **Alertas** (atrasos, prazos de amanhã, aprovações paradas, stock mínimo, rupturas, validades): corridos automaticamente ao abrir notificações (no
-  máximo a cada 15 min), pelo botão na Central de Excepções, ou por cron: `python -m scripts.verificar_alertas`.
+- **Automações** (`backend/app/modules/automacao/agendador.py`): correm em segundo plano de 10 em 10 minutos
+  (desligar com `AUTOMACOES_EM_FUNDO=0`) e também ao abrir as notificações — alertas (atrasos, prazos de amanhã,
+  aprovações paradas, stock mínimo, rupturas, validades…), resumo semanal à segunda-feira e aviso do relatório mensal.
+  São idempotentes. Também por cron: `python -m scripts.verificar_alertas`. A CEO liga/desliga em **Automações**.
+- **Relatório mensal** (CEO): menu **Relatório mensal**, imprimível em PDF.
 - **Cópias de segurança**: `DATABASE_URL=… ./scripts/backup.sh /caminho/backups` (diário recomendado; retém 30).
   Restaurar: `pg_restore --clean --if-exists -d "$DATABASE_URL" ficheiro.dump`.
 - **Publicação**: backend como serviço Docker (`backend/Dockerfile`, corre as migrações ao arrancar); frontend como

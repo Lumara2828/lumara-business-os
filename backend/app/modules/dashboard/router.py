@@ -36,7 +36,9 @@ MODULOS = [
     {"modulo": "Vendas e Clientes", "fase": 4, "estado": "activo"},
     {"modulo": "Finanças e Rentabilidade", "fase": 5, "estado": "activo"},
     {"modulo": "Procedimentos e Documentação", "fase": 5, "estado": "activo"},
-    {"modulo": "IA e Automação avançada", "fase": 6, "estado": "planeado"},
+    {"modulo": "Assistente de gestão e relatório mensal", "fase": 6, "estado": "activo"},
+    {"modulo": "Automações internas", "fase": 6, "estado": "activo"},
+    {"modulo": "Integrações externas (Instagram, WhatsApp…)", "fase": 6, "estado": "planeado"},
 ]
 
 
