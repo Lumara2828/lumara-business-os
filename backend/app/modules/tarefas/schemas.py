@@ -121,6 +121,7 @@ class TarefaOut(BaseModel):
     submetida_em: datetime | None
     aprovada_em: datetime | None
     actividade_recorrente_id: UUID | None
+    procedimento_ref: str | None = None
     em_atraso: bool
     dias_atraso: int
     concluida_no_prazo: bool | None

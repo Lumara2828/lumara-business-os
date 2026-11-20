@@ -118,6 +118,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
           </dl>
           {t.descricao && <p className="text-sm whitespace-pre-wrap bg-white rounded-xl border border-linho p-3">{t.descricao}</p>}
           {t.resultado_esperado && <p className="text-sm"><span className="text-terra-700">Resultado esperado:</span> {t.resultado_esperado}</p>}
+          {t.procedimento_ref && <AbrirPop codigo={t.procedimento_ref} />}
 
           <div className="flex flex-wrap gap-2 border-y border-linho py-3">
             {t.permissoes.aprovar && <>
@@ -216,4 +217,14 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
 
 function Info({ r, v }: { r: string; v: string }) {
   return <div><dt className="text-xs text-terra-700">{r}</dt><dd className="font-medium">{v}</dd></div>;
+}
+
+
+function AbrirPop({ codigo }: { codigo: string }) {
+  const toast = useToast();
+  const abrir = async () => {
+    try { const p = await api.get<{ id: string }>(`/procedimentos/codigo/${encodeURIComponent(codigo)}`); window.location.assign(`/procedimentos?abrir=${p.id}`); }
+    catch (e) { toast(mensagemErro(e), "erro"); }
+  };
+  return <p className="text-sm"><span className="text-terra-700">Procedimento:</span> <button className="underline text-folha-700" onClick={abrir}>{codigo} — ver instruções e checklist</button></p>;
 }

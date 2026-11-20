@@ -24,6 +24,8 @@ def garantir_base(db) -> None:
         if nome not in existentes:
             db.add(CategoriaTarefa(nome=nome, area=area, cor=cor))
     db.commit()
+    from app.modules.financas.router import garantir_categorias
+    garantir_categorias(db)
 
 
 if __name__ == "__main__":

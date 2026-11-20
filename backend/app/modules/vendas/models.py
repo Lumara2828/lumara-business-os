@@ -14,7 +14,7 @@ from decimal import Decimal
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Identity, Integer, Numeric, Sequence, String, Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -154,3 +154,23 @@ class Pagamento(Base):
 
     __table_args__ = (CheckConstraint("valor_kz <> 0", name="pagamento_nao_nulo"),
                       CheckConstraint("valor_kz > 0 OR motivo IS NOT NULL", name="estorno_com_motivo"))
+
+
+class Devolucao(Base):
+    """Devolução (total ou parcial) de uma encomenda entregue. Reduz a facturação líquida
+    do mês; os produtos em condições voltam ao lote de origem (movimento «devolucao»),
+    os outros ficam registados como perda. O reembolso é um estorno no pagamento."""
+
+    __tablename__ = "devolucoes"
+
+    id: Mapped[uuid.UUID] = pk_uuid()
+    encomenda_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("encomendas.id"), nullable=False, index=True)
+    data_devolucao: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    itens: Mapped[list] = mapped_column(JSONB, nullable=False)  # [{"artigo_id", "quantidade", "repor_stock", "valor_kz"}]
+    valor_kz: Mapped[Decimal] = mapped_column(KZ, nullable=False)
+    motivo: Mapped[str] = mapped_column(Text, nullable=False)
+    registada_por_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"), nullable=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    criado_em: Mapped[datetime] = criado_em()
+
+    __table_args__ = (CheckConstraint("valor_kz >= 0", name="devolucao_valor_positivo"),)

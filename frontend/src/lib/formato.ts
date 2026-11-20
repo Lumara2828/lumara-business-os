@@ -141,3 +141,11 @@ export const ESTADOS_ENCOMENDA: Record<string, [string, string]> = {
 export const ESTADOS_PAGAMENTO: Record<string, [string, string]> = {
   pendente: ["Por pagar", "bg-amber-100 text-aviso"], parcial: ["Pago parcialmente", "bg-amber-50 text-aviso"], pago: ["Pago", "bg-folha-100 text-folha-700"],
   a_reembolsar: ["A reembolsar", "bg-red-50 text-alerta"], sem_pagamento: ["—", "bg-areia"] };
+
+export const NATUREZAS: Record<string, string> = { producao: "Produção", embalagem: "Embalagem", marketing: "Marketing", pessoal: "Pessoal",
+  operacional: "Operacional", transporte: "Transporte", impostos: "Impostos", compras_stock: "Compras para stock", investimento: "Investimento", outra: "Outra" };
+export const ESTADOS_LANCAMENTO: Record<string, [string, string]> = {
+  proposta: ["Proposta", "bg-amber-100 text-aviso"], aprovada: ["Aprovada · por pagar", "bg-folha-100 text-folha-700"],
+  paga: ["Paga", "bg-folha-600 text-white"], rejeitada: ["Rejeitada", "bg-linho text-terra-700"], anulada: ["Anulada", "bg-linho text-terra-700"] };
+export const AREAS_POP: Record<string, string> = { producao: "Produção", qualidade: "Controlo de qualidade", stock: "Stock", atendimento: "Atendimento",
+  marketing: "Marketing", administrativo: "Administrativo" };

@@ -154,6 +154,7 @@ function DetalheEncomenda({ id, aoFechar, aoMudar }: { id: string; aoFechar: () 
   const vendas = pode("vendas.gerir");
   const { dados: e, recarregar } = useDados(() => api.get<EncomendaV>(`/vendas/encomendas/${id}`), [id]);
   const [pag, setPag] = useState<{ valor: string; forma: string; referencia: string; motivo: string } | null>(null);
+  const [devol, setDevol] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const accao = async (fn: () => Promise<unknown>, msg: string) => {
     setOcupado(true);
@@ -193,6 +194,7 @@ function DetalheEncomenda({ id, aoFechar, aoMudar }: { id: string; aoFechar: () 
           {e.estado === "pronta" && <button className="btn-primario" disabled={ocupado} onClick={() => confirm("Confirmar a entrega? Dá saída do stock.") && estado("entregue")}>Marcar como entregue</button>}
           {vendas && e.estado !== "cancelada" && Number(e.em_divida_kz) > 0 && <button className="btn-secundario" onClick={() => setPag({ valor: e.em_divida_kz!, forma: e.forma_pagamento ?? "multicaixa_express", referencia: "", motivo: "" })}>Registar pagamento</button>}
           {vendas && e.cliente.whatsapp && <button className="btn-secundario" onClick={whatsapp}>Mensagem WhatsApp</button>}
+          {vendas && e.estado === "entregue" && <button className="btn-fantasma" onClick={() => setDevol(true)}>Registar devolução</button>}
           <span className="flex-1" />
           {vendas && !["entregue", "cancelada"].includes(e.estado) && <button className="btn-fantasma text-alerta" onClick={() => { const m = prompt("Motivo do cancelamento:"); if (m?.trim()) estado("cancelada", m); }}>Cancelar</button>}
         </div>
@@ -209,9 +211,43 @@ function DetalheEncomenda({ id, aoFechar, aoMudar }: { id: string; aoFechar: () 
         {!!e.pagamentos?.length && <div><h3 className="font-serif text-lg">Pagamentos</h3><ul className="divide-y divide-linho/60">{e.pagamentos.map((p) => (
           <li key={p.id} className="py-1.5 flex flex-wrap gap-3"><span className="w-24">{fData(p.data_pagamento)}</span><span className={`w-32 text-right font-medium ${Number(p.valor_kz) < 0 ? "text-alerta" : ""}`}>{fMoeda(p.valor_kz)}</span>
             <span>{FORMAS_PAGAMENTO[p.forma]}{p.referencia ? ` · ${p.referencia}` : ""}{p.motivo ? ` · ${p.motivo}` : ""}</span><span className="text-xs text-terra-700">{p.registado_por}</span></li>))}</ul></div>}
+        {!!e.devolucoes?.length && <div><h3 className="font-serif text-lg">Devoluções</h3><ul className="divide-y divide-linho/60">{e.devolucoes.map((d) => (
+          <li key={d.id} className="py-1.5">{fData(d.data)} · {d.itens.map((i) => `${fQtd(i.quantidade)} × ${limpa(i.artigo)}${i.repor_stock ? " (reposto)" : " (não reposto)"}`).join(", ")}
+            {d.valor_kz && <b> · {fMoeda(d.valor_kz)}</b>}<span className="block text-xs text-terra-700">{d.motivo}</span></li>))}</ul></div>}
         {!!e.lotes_entregues?.length && <div><h3 className="font-serif text-lg">Lotes entregues (rastreabilidade)</h3><ul className="text-xs text-terra-700">{e.lotes_entregues.map((l, i) =>
           <li key={i}>{limpa(l.artigo)} — {fQtd(l.quantidade)} do lote {l.lote ?? "—"}{l.validade ? ` (validade ${fData(l.validade)})` : ""}</li>)}</ul></div>}
       </div>
+      {devol && <FormDevolucao e={e} aoFechar={() => setDevol(false)} aoGuardar={() => { setDevol(false); recarregar(); aoMudar(); }} />}
+    </Modal>
+  );
+}
+
+function FormDevolucao({ e, aoFechar, aoGuardar }: { e: EncomendaV; aoFechar: () => void; aoGuardar: () => void }) {
+  const toast = useToast();
+  const [q, setQ] = useState<Record<string, { quantidade: string; repor: boolean }>>(Object.fromEntries(e.linhas.map((l) => [l.artigo.id, { quantidade: "", repor: true }])));
+  const [motivo, setMotivo] = useState("");
+  const [reemb, setReemb] = useState({ valor: "", forma: "multicaixa_express" });
+  const submeter = async (ev: FormEvent) => {
+    ev.preventDefault();
+    const itens = Object.entries(q).filter(([, v]) => Number(v.quantidade) > 0).map(([artigo_id, v]) => ({ artigo_id, quantidade: v.quantidade, repor_stock: v.repor }));
+    if (!itens.length || motivo.trim().length < 3) return toast("Indique as quantidades devolvidas e o motivo.", "erro");
+    try { await api.post(`/vendas/encomendas/${e.id}/devolucoes`, { itens, motivo, reembolso_kz: reemb.valor || null, forma_reembolso: reemb.valor ? reemb.forma : null });
+      toast("Devolução registada."); aoGuardar(); } catch (err) { toast(mensagemErro(err), "erro"); }
+  };
+  return (
+    <Modal aberto aoFechar={aoFechar} titulo={`Devolução — ${e.codigo}`}>
+      <form onSubmit={submeter} className="space-y-3 text-sm" noValidate>
+        {e.linhas.map((l) => (
+          <div key={l.artigo.id} className="flex flex-wrap items-center gap-2"><span className="flex-1">{limpa(l.artigo.nome)} <span className="text-xs text-terra-700">(entregue {fQtd(l.quantidade)})</span></span>
+            <input type="number" min={0} step="any" className="campo !w-24" aria-label={`Quantidade devolvida de ${l.artigo.nome}`} value={q[l.artigo.id].quantidade}
+              onChange={(x) => setQ({ ...q, [l.artigo.id]: { ...q[l.artigo.id], quantidade: x.target.value } })} />
+            <label className="flex gap-1 text-xs"><input type="checkbox" className="accent-folha-600" checked={q[l.artigo.id].repor} onChange={(x) => setQ({ ...q, [l.artigo.id]: { ...q[l.artigo.id], repor: x.target.checked } })} />em condições (volta ao stock)</label></div>))}
+        <div><label className="rotulo">Motivo *</label><input className="campo" value={motivo} onChange={(x) => setMotivo(x.target.value)} /></div>
+        <div className="grid grid-cols-2 gap-2"><div><label className="rotulo">Reembolso (Kz, opcional)</label><input type="number" min={0} step="any" className="campo" value={reemb.valor} onChange={(x) => setReemb({ ...reemb, valor: x.target.value })} /></div>
+          <div><label className="rotulo">Forma</label><select className="campo" value={reemb.forma} onChange={(x) => setReemb({ ...reemb, forma: x.target.value })}>{Object.entries(FORMAS_PAGAMENTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div></div>
+        <p className="text-xs text-terra-700">O valor devolvido reduz a facturação líquida do mês; os produtos «em condições» voltam ao lote de onde saíram.</p>
+        <div className="flex justify-end gap-2"><button type="button" className="btn-secundario" onClick={aoFechar}>Cancelar</button><button className="btn-primario">Registar devolução</button></div>
+      </form>
     </Modal>
   );
 }

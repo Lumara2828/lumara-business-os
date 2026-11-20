@@ -14,6 +14,7 @@ from app.modules.configuracao import service as config
 from app.modules.dashboard import metricas
 from app.modules.dashboard.resumo import resumo_executivo
 from app.modules.ocorrencias.models import Ocorrencia
+from app.modules.procedimentos.models import Procedimento
 from app.modules.producao import service as producao_svc
 from app.modules.stock import service as stock_svc
 from app.modules.ocorrencias.router import ROTULO_TIPO
@@ -33,8 +34,8 @@ MODULOS = [
     {"modulo": "Campanhas", "fase": 3, "estado": "activo"},
     {"modulo": "Eventos e feiras", "fase": 4, "estado": "activo"},
     {"modulo": "Vendas e Clientes", "fase": 4, "estado": "activo"},
-    {"modulo": "Finanças e Rentabilidade", "fase": 5, "estado": "planeado"},
-    {"modulo": "Procedimentos e Documentação", "fase": 5, "estado": "planeado"},
+    {"modulo": "Finanças e Rentabilidade", "fase": 5, "estado": "activo"},
+    {"modulo": "Procedimentos e Documentação", "fase": 5, "estado": "activo"},
     {"modulo": "IA e Automação avançada", "fase": 6, "estado": "planeado"},
 ]
 
@@ -66,9 +67,42 @@ def executivo(
         "producao": producao_svc.estado_producao(db),
         "marketing": _marketing_resumo(db, ini, fim),
         "vendas": _vendas_resumo(db, ini, fim, ini_ant, fim_ant),
+        "financas": _financas_resumo(db, ini, fim, ini_ant, fim_ant),
         "modulos": MODULOS,
         "gerado_em": agora(),
     }
+
+
+def _financas_resumo(db: Session, ini, fim, ini_ant, fim_ant) -> dict:
+    """Resultado do período (soma dos meses do período: mês, trimestre ou ano)."""
+    from decimal import Decimal
+    from app.modules.financas import service as fin
+    from app.modules.financas.models import Lancamento
+
+    def soma(i, f):
+        chaves = ("facturacao_liquida_kz", "custo_mercadorias_vendidas_kz", "margem_bruta_kz", "despesas_total_kz", "perdas_stock_kz", "resultado_kz")
+        tot = {k: Decimal(0) for k in chaves}
+        incompleto = False
+        a, m = i.year, i.month
+        while (a, m) <= (f.year, f.month):
+            r = fin.resultados(db, a, m)
+            incompleto = incompleto or not r["completo"]
+            for k in chaves:
+                tot[k] += Decimal(r[k])
+            a, m = (a + 1, 1) if m == 12 else (a, m + 1)
+        fact = tot["facturacao_liquida_kz"]
+        out = {k: str(v) for k, v in tot.items()}
+        out["margem_lucro_pct"] = str((tot["resultado_kz"] / fact * 100).quantize(Decimal("0.1"))) if fact and not incompleto else None
+        out["completo"] = not incompleto
+        return out
+    cp = fin.contas_a_pagar(db)
+    meta = config.obter(db, "meta_facturacao_mensal_kz")
+    meses = (fim.year - ini.year) * 12 + fim.month - ini.month + 1
+    return {"actual": soma(ini, fim), "anterior": soma(ini_ant, fim_ant),
+            "meta_facturacao_kz": str(Decimal(str(meta)) * meses) if meta is not None else None,
+            "contas_a_pagar_kz": str(sum((l.valor_kz for l in cp), Decimal(0))),
+            "contas_vencidas": sum(1 for l in cp if l.data_vencimento and l.data_vencimento < hoje()),
+            "despesas_propostas": db.scalar(select(func.count()).where(Lancamento.estado == "proposta")) or 0}
 
 
 def _vendas_resumo(db: Session, ini, fim, ini_ant, fim_ant) -> dict:
@@ -170,6 +204,20 @@ def _encomendas_pessoal(db: Session, ctx: Contexto) -> list[dict] | None:
              "atrasada": bool(e.data_prevista and e.data_prevista < hoje())} for e in lista]
 
 
+def _financas_excepcoes(db: Session) -> dict:
+    from app.modules.financas import service as fin
+    from app.modules.financas.models import Lancamento
+    d = hoje()
+    orc = [o for o in fin.orcamento_vs_real(db, d.year, d.month) if o["excedido"]]
+    propostas = db.scalars(select(Lancamento).where(Lancamento.estado == "proposta").order_by(Lancamento.criado_em)).unique().all()
+    vencidas = [l for l in fin.contas_a_pagar(db) if l.data_vencimento and l.data_vencimento < d]
+    lin = lambda l: {"id": str(l.id), "codigo": f"D-{l.numero:04d}", "descricao": l.descricao, "valor_kz": str(l.valor_kz),  # noqa: E731
+                     "categoria": l.categoria.nome, "proposto_por": l.proposto_por.nome, "data_vencimento": l.data_vencimento}
+    return {"orcamento_excedido": [{"categoria": o["categoria"]["nome"], "orcamento_kz": o["orcamento_kz"], "realizado_kz": o["realizado_kz"],
+                                    "utilizacao_pct": o["utilizacao_pct"]} for o in orc],
+            "despesas_propostas": [lin(l) for l in propostas], "contas_vencidas": [lin(l) for l in vencidas]}
+
+
 def _conteudos_revisao(db: Session) -> list[dict]:
     from app.modules.marketing.models import Conteudo
     return [{"id": str(c.id), "codigo": f"C-{c.numero:04d}", "tema": c.tema, "plataforma": c.plataforma,
@@ -235,6 +283,9 @@ def excepcoes(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = De
         "outras_ocorrencias": occ({"outro"}),
         "desvios_metas": desvios,
         "conteudos_aprovacao": _conteudos_revisao(db),
+        "financas": _financas_excepcoes(db),
+        "procedimentos_aprovacao": [{"id": str(p.id), "codigo": p.codigo, "versao": p.versao, "titulo": p.titulo, "criado_por": p.criado_por.nome}
+                                    for p in db.scalars(select(Procedimento).where(Procedimento.estado == "em_aprovacao")).unique()],
         "campanhas_aprovacao": _campanhas_propostas(db),
     }
     total = sum(len(v) for v in seccoes.values())

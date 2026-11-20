@@ -20,6 +20,9 @@ PADRAO: dict[str, dict] = {
     "limite_desconto_pct": {"valor": 10, "descricao": "Desconto máximo (%) sem aprovação da CEO"},
     "dias_cobranca": {"valor": 7, "descricao": "Dias após a entrega até alertar pagamento em falta"},
     "dias_cliente_inactivo": {"valor": 90, "descricao": "Dias sem comprar para considerar uma cliente inactiva"},
+    "custo_mao_obra_hora_kz": {"valor": None, "descricao": "Custo de mão-de-obra directa por hora (Kz) — para a ficha de custos"},
+    "meta_facturacao_mensal_kz": {"valor": None, "descricao": "Meta de facturação mensal (Kz)"},
+    "margem_minima_pct": {"valor": None, "descricao": "Margem bruta mínima por produto (%) — abaixo disto é assinalado"},
     "moeda": {"valor": "AOA", "descricao": "Moeda base (Kwanza)"},
 }
 

@@ -19,7 +19,7 @@ from app.core.tipos import criado_em, enum_texto, pk_uuid
 
 CATEGORIAS = ("materia_prima", "embalagem", "produto_acabado")
 UNIDADES = ("g", "kg", "ml", "l", "un")
-TIPOS_MOVIMENTO = ("entrada", "saida", "consumo", "producao", "perda", "ajustamento", "inventario")
+TIPOS_MOVIMENTO = ("entrada", "saida", "consumo", "producao", "perda", "ajustamento", "inventario", "devolucao")
 
 QTD = Numeric(14, 3)
 DINHEIRO = Numeric(14, 2)
@@ -113,7 +113,7 @@ class Movimento(Base):
     __table_args__ = (
         CheckConstraint("quantidade <> 0", name="movimento_nao_nulo"),
         CheckConstraint(
-            "(tipo IN ('entrada','producao') AND quantidade > 0) OR (tipo IN ('saida','consumo','perda') AND quantidade < 0)"
+            "(tipo IN ('entrada','producao','devolucao') AND quantidade > 0) OR (tipo IN ('saida','consumo','perda') AND quantidade < 0)"
             " OR tipo IN ('ajustamento','inventario')", name="movimento_sinal_coerente"),
         CheckConstraint("tipo NOT IN ('perda','ajustamento','inventario') OR motivo IS NOT NULL", name="movimento_motivo_obrigatorio"),
     )

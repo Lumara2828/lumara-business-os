@@ -38,14 +38,19 @@ def limpar(db):
     # (o trigger é suspenso só dentro desta transacção e reactivado no fim).
     db.execute(text("ALTER TABLE movimentos_stock DISABLE TRIGGER movimentos_stock_imutavel"))
     db.execute(text("ALTER TABLE pagamentos DISABLE TRIGGER pagamentos_imutavel"))
-    db.execute(text("DELETE FROM pagamentos WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo)"))
+    db.execute(text("DELETE FROM pagamentos WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo OR cliente_id IN (SELECT id FROM clientes WHERE is_demo) OR evento_id IN (SELECT id FROM eventos WHERE is_demo))"))
     db.execute(text("ALTER TABLE pagamentos ENABLE TRIGGER pagamentos_imutavel"))
-    db.execute(text("DELETE FROM movimentos_stock WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo)"))
+    db.execute(text("DELETE FROM devolucoes WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo OR cliente_id IN (SELECT id FROM clientes WHERE is_demo) OR evento_id IN (SELECT id FROM eventos WHERE is_demo))"))
+    db.execute(text("DELETE FROM lancamentos WHERE is_demo"))
+    db.execute(text("DELETE FROM despesas_fixas WHERE is_demo"))
+    db.execute(text("DELETE FROM execucoes_procedimento WHERE procedimento_id IN (SELECT id FROM procedimentos WHERE is_demo)"))
+    db.execute(text("DELETE FROM procedimentos WHERE is_demo"))
+    db.execute(text("DELETE FROM movimentos_stock WHERE encomenda_id IN (SELECT id FROM encomendas WHERE is_demo OR cliente_id IN (SELECT id FROM clientes WHERE is_demo) OR evento_id IN (SELECT id FROM eventos WHERE is_demo))"))
     db.execute(text("UPDATE ordens_producao SET lote_id = NULL, tarefa_id = NULL WHERE is_demo"))
     db.execute(text("DELETE FROM nao_conformidades WHERE ordem_id IN (SELECT id FROM ordens_producao WHERE is_demo)"))
     db.execute(text("DELETE FROM movimentos_stock WHERE artigo_id IN (SELECT id FROM artigos WHERE is_demo)"))
     db.execute(text("ALTER TABLE movimentos_stock ENABLE TRIGGER movimentos_stock_imutavel"))
-    db.execute(text("DELETE FROM encomendas WHERE is_demo"))
+    db.execute(text("DELETE FROM encomendas WHERE id IN (SELECT id FROM encomendas WHERE is_demo OR cliente_id IN (SELECT id FROM clientes WHERE is_demo) OR evento_id IN (SELECT id FROM eventos WHERE is_demo))"))
     db.execute(text("DELETE FROM eventos WHERE is_demo"))
     db.execute(text("DELETE FROM clientes WHERE is_demo"))
     db.execute(text("DELETE FROM precos WHERE is_demo"))
@@ -182,6 +187,7 @@ def semear(db):
     semear_producao(db, u["producao"], u["ceo"])
     semear_marketing(db, u["marketing"], u["ceo"])
     semear_vendas(db, u["marketing"], u["producao"], u["ceo"])
+    semear_financas_procedimentos(db, u["marketing"], u["producao"], u["ceo"])
     db.commit()
     print("Dados DEMO criados.")
     for nome, email, funcao, _ in USERS:
@@ -343,6 +349,42 @@ def semear_vendas(db, maira, diana, luisa):
         ["Confirmar inscrição e localização da banca", "Preparar produtos e etiquetas de preço", "Levar TPA/terminal e troco"])]
     ev.produtos = [EventoProduto(artigo_id=unhas.id, quantidade_planeada=D(10))]
     db.add(ev)
+    db.flush()
+
+
+def semear_financas_procedimentos(db, maira, diana, luisa):
+    """Fase 5 — procedimentos DEMO (os códigos usados pelas actividades DEMO) e uma despesa proposta FICTÍCIA."""
+    from decimal import Decimal as D
+    from app.core.tempo import agora
+    from app.modules.financas.models import CategoriaFinanceira, Lancamento
+    from app.modules.procedimentos.models import Procedimento
+
+    pops = [
+        ("POP-STK-01", "Contagem semanal de matérias-primas e embalagens", "stock", "producao",
+         "Manter o stock registado igual ao stock físico e detectar necessidades de compra a tempo.",
+         ["Abrir Stock → Artigos e filtrar matérias-primas e embalagens", "Contar fisicamente cada artigo, lote a lote",
+          "Registar cada contagem em «Inventário físico» com uma observação", "Comunicar necessidades de compra como ocorrência ou proposta de despesa"],
+         ["Todos os artigos contados", "Diferenças registadas com motivo", "Necessidades comunicadas"]),
+        ("POP-ATD-01", "Resposta a mensagens de potenciais clientes", "atendimento", "marketing",
+         "Responder a todas as mensagens em menos de 24 horas, com informação correcta.",
+         ["Ver as mensagens do Instagram, Facebook e WhatsApp", "Responder com os preços em vigor (Vendas → Preços)",
+          "Registar a cliente e a encomenda quando houver pedido", "Nunca prometer resultados nem fazer alegações médicas"],
+         ["Todas as mensagens respondidas", "Encomendas registadas no sistema"]),
+        ("POP-MKT-01", "Publicação de conteúdos do calendário", "marketing", "marketing",
+         "Publicar apenas conteúdos aprovados, na data planeada, e registar resultados.",
+         ["Confirmar que o conteúdo está «Aprovado»", "Publicar na plataforma indicada", "Marcar como publicado com o link",
+          "Registar as métricas ao fim de 7 dias"],
+         ["Conteúdo aprovado antes de publicar", "Link registado", "Métricas registadas"]),
+    ]
+    for cod, tit, area, func_, obj, etapas, check in pops:
+        db.add(Procedimento(codigo=cod, versao=1, titulo=f"[DEMO] {tit}", area=area, objectivo=obj, funcao_responsavel=func_,
+                            etapas=[{"descricao": e} for e in etapas], checklist=check, estado="aprovado", criado_por_id=luisa.id,
+                            aprovado_por_id=luisa.id, aprovado_em=agora(), is_demo=True))
+    cat = db.scalar(select(CategoriaFinanceira).where(CategoriaFinanceira.nome == "Embalagens e rótulos"))
+    if cat:
+        db.add(Lancamento(tipo="despesa", categoria_id=cat.id, descricao="[DEMO] Frascos âmbar de 30 ml (valor fictício)", valor_kz=D("10000"),
+                          data_competencia=hoje(), estado="proposta", proposto_por_id=diana.id, is_demo=True,
+                          justificacao="Stock abaixo do mínimo — valor fictício de demonstração."))
     db.flush()
 
 

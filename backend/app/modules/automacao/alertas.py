@@ -62,6 +62,7 @@ def verificar(db: Session) -> dict:
     criados.update(verificar_validades(db))
     criados.update(verificar_conteudos(db))
     criados.update(verificar_encomendas(db))
+    criados.update(verificar_financas(db))
 
     linha = db.get(Configuracao, "_ultima_verificacao_alertas")
     marca = {"valor": agora().isoformat()}
@@ -181,3 +182,21 @@ def verificar_encomendas(db: Session) -> dict:
             notificar_ceo(db, "cobranca", titulo, msg, "/vendas", chave_dedup=f"cob-ceo:{e.id}:{d.isoformat()}")
             n += 1
     return {"encomendas": n}
+
+
+def verificar_financas(db: Session) -> dict:
+    """Contas a pagar vencidas e orçamento excedido no mês → CEO (uma vez por dia)."""
+    from app.modules.financas import service as fin
+    d = hoje()
+    n = 0
+    for l in fin.contas_a_pagar(db):
+        if l.data_vencimento and l.data_vencimento < d:
+            notificar_ceo(db, "conta_vencida", f"Conta a pagar vencida: {l.descricao}", f"{l.valor_kz} Kz — venceu a {formatar_data(l.data_vencimento)}.",
+                          "/financas", chave_dedup=f"venc:{l.id}:{d.isoformat()}")
+            n += 1
+    for o in fin.orcamento_vs_real(db, d.year, d.month):
+        if o["excedido"]:
+            notificar_ceo(db, "orcamento", f"Orçamento excedido: {o['categoria']['nome']}", f"{o['realizado_kz']} de {o['orcamento_kz']} Kz este mês.",
+                          "/financas", chave_dedup=f"orc-mes:{o['categoria']['id']}:{d.isoformat()}")
+            n += 1
+    return {"financas": n}

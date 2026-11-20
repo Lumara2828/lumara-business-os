@@ -5,8 +5,9 @@ import { useToast } from "../components/Toast";
 import { Seccao } from "../components/ui";
 import { mensagemErro, useDados } from "../lib/useDados";
 
-interface Config { chave: string; valor: number | string; descricao: string }
-const EDITAVEIS = ["meta_cumprimento_prazos", "dias_atraso_alerta_ceo", "dias_aprovacao_pendente"];
+interface Config { chave: string; valor: number | string | null; descricao: string }
+const EDITAVEIS = ["meta_cumprimento_prazos", "dias_atraso_alerta_ceo", "dias_aprovacao_pendente", "dias_alerta_validade", "limite_desconto_pct",
+  "dias_cobranca", "dias_cliente_inactivo", "meta_facturacao_mensal_kz", "custo_mao_obra_hora_kz", "margem_minima_pct"];
 
 export default function Definicoes() {
   const { pode, recarregar } = useAuth();
@@ -41,13 +42,13 @@ export default function Definicoes() {
         </form>
       </Seccao>
       {pode("configuracao.gerir") && config.dados && (
-        <Seccao titulo="Metas e alertas">
+        <Seccao titulo="Metas, limites e alertas">
           <ul className="divide-y divide-linho/60">
             {config.dados.filter((c) => EDITAVEIS.includes(c.chave)).map((c) => (
               <li key={c.chave} className="py-3 flex flex-wrap items-center gap-3">
                 <label className="flex-1 min-w-60 text-sm" htmlFor={c.chave}>{c.descricao}</label>
-                <input id={c.chave} type="number" className="campo !w-24" value={valores[c.chave] ?? String(c.valor)} onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })} />
-                <button className="btn-secundario" disabled={valores[c.chave] === undefined || valores[c.chave] === String(c.valor)} onClick={() => guardar(c)}>Guardar</button>
+                <input id={c.chave} type="number" min={0} className="campo !w-36" placeholder="por definir" value={valores[c.chave] ?? (c.valor === null ? "" : String(c.valor))} onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })} />
+                <button className="btn-secundario" disabled={valores[c.chave] === undefined || valores[c.chave] === "" || valores[c.chave] === String(c.valor)} onClick={() => guardar(c)}>Guardar</button>
               </li>))}
           </ul>
           <p className="text-xs text-terra-700 mt-2">Moeda base: Kwanza (Kz). Planeamento à segunda-feira, revisão à sexta-feira.</p>

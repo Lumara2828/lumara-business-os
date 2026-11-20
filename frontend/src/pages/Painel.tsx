@@ -33,7 +33,9 @@ interface Executivo {
   producao: { planeadas: number; em_curso: number; atrasadas: number; nao_conformidades_abertas: number };
   marketing: MarketingResumo;
   vendas: VendasResumo;
+  financas: { actual: FinP; anterior: FinP; meta_facturacao_kz: string | null; contas_a_pagar_kz: string; contas_vencidas: number; despesas_propostas: number };
 }
+interface FinP { facturacao_liquida_kz: string; despesas_total_kz: string; resultado_kz: string; margem_lucro_pct: string | null; margem_bruta_kz: string; completo: boolean }
 
 interface IndV { facturacao_kz: string; recebido_kz: string; encomendas_entregues: number; encomendas_recebidas: number; clientes_compradoras: number; clientes_novas: number; ticket_medio_kz: string | null }
 interface VendasResumo { actual: IndV; anterior: IndV; top_produtos: { nome: string; unidade: string; quantidade: string; valor_kz: string }[];
@@ -154,7 +156,17 @@ function PainelExecutivo() {
         <Kpi titulo="Por receber" valor={fMoeda(d.vendas.por_receber_kz)} tom={d.vendas.por_receber_atrasado ? "alerta" : Number(d.vendas.por_receber_kz) ? "aviso" : "bom"}
           detalhe={d.vendas.por_receber_atrasado ? `${d.vendas.por_receber_atrasado} pagamento(s) em atraso` : "Sem atrasos de pagamento"} />
       </div>
-      <p className="text-xs text-terra-700 -mt-3">Facturação = encomendas entregues; recebido = pagamentos registados. Despesas, resultado e margem do mês chegam com as Finanças (Fase 5).</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi titulo="Despesas" valor={fMoeda(d.financas.actual.despesas_total_kz)} detalhe={<VarKz a={d.financas.actual.despesas_total_kz} b={d.financas.anterior.despesas_total_kz} />} aoClicar={() => navegar("/financas")} />
+        <Kpi titulo="Resultado operacional" valor={fMoeda(d.financas.actual.resultado_kz)} tom={!d.financas.actual.completo ? "aviso" : Number(d.financas.actual.resultado_kz) >= 0 ? "bom" : "alerta"}
+          detalhe={d.financas.actual.completo ? <VarKz a={d.financas.actual.resultado_kz} b={d.financas.anterior.resultado_kz} /> : "Incompleto: há vendas sem custo registado"} />
+        <Kpi titulo="Margem de lucro" valor={d.financas.actual.margem_lucro_pct === null ? "—" : `${d.financas.actual.margem_lucro_pct.replace(".", ",")}%`}
+          detalhe={`Período anterior: ${d.financas.anterior.margem_lucro_pct === null ? "—" : d.financas.anterior.margem_lucro_pct.replace(".", ",") + "%"}`} />
+        <Kpi titulo="Facturação vs meta" valor={d.financas.meta_facturacao_kz ? `${Math.round(100 * Number(d.financas.actual.facturacao_liquida_kz) / Number(d.financas.meta_facturacao_kz))}%` : "—"}
+          tom={d.financas.meta_facturacao_kz ? (Number(d.financas.actual.facturacao_liquida_kz) >= Number(d.financas.meta_facturacao_kz) ? "bom" : "aviso") : "neutro"}
+          detalhe={d.financas.meta_facturacao_kz ? `Meta ${fMoeda(d.financas.meta_facturacao_kz)} · líquida ${fMoeda(d.financas.actual.facturacao_liquida_kz)}` : "Defina a meta em Definições"} />
+      </div>
+      <p className="text-xs text-terra-700 -mt-3">Facturação = encomendas entregues; recebido = pagamentos registados; resultado = facturação líquida − custo dos produtos vendidos − despesas − perdas. Por pagar: {fMoeda(d.financas.contas_a_pagar_kz)}{d.financas.contas_vencidas ? ` (${d.financas.contas_vencidas} vencida(s))` : ""}{d.financas.despesas_propostas ? ` · ${d.financas.despesas_propostas} despesa(s) proposta(s)` : ""}.</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi titulo="Cumprimento de prazos" valor={actual.taxa_cumprimento === null ? "—" : `${actual.taxa_cumprimento}%`}

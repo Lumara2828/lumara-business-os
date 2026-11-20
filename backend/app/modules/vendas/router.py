@@ -274,9 +274,12 @@ def _saida(ctx, db, e, extra=False):
             s["pagamentos"] = [{"id": p.id, "valor_kz": str(p.valor_kz), "data_pagamento": p.data_pagamento, "forma": p.forma,
                                 "referencia": p.referencia, "motivo": p.motivo, "registado_por": p.registado_por.nome}
                                for p in db.scalars(select(Pagamento).where(Pagamento.encomenda_id == e.id).order_by(Pagamento.id))]
+        from app.modules.vendas.models import Devolucao
+        s["devolucoes"] = [{"id": d.id, "data": d.data_devolucao, "valor_kz": str(d.valor_kz) if ctx.pode(P.VENDAS_GERIR) else None,
+                            "motivo": d.motivo, "itens": d.itens} for d in db.scalars(select(Devolucao).where(Devolucao.encomenda_id == e.id))]
         s["lotes_entregues"] = [{"artigo": m.artigo.nome, "lote": m.lote.numero if m.lote else None, "quantidade": str(-m.quantidade),
                                  "validade": m.lote.validade if m.lote else None}
-                                for m in db.scalars(select(Movimento).where(Movimento.encomenda_id == e.id)).unique()]
+                                for m in db.scalars(select(Movimento).where(Movimento.encomenda_id == e.id, Movimento.tipo == "saida")).unique()]
     return s
 
 
@@ -502,7 +505,9 @@ def indicadores(db: Session, de: date, ate: date) -> dict:
     primeira = select(Encomenda.cliente_id, func.min(de_ent).label("p")).where(Encomenda.estado == "entregue").group_by(Encomenda.cliente_id).subquery()
     novos = db.scalar(select(func.count()).select_from(primeira).where(primeira.c.p >= de, primeira.c.p <= ate))
     n, fact, clientes = ent
-    return {"facturacao_kz": str(fact), "recebido_kz": str(recebido), "encomendas_entregues": n, "encomendas_recebidas": recebidas,
+    from app.modules.vendas.models import Devolucao
+    devol = db.scalar(select(func.coalesce(func.sum(Devolucao.valor_kz), 0)).where(Devolucao.data_devolucao >= de, Devolucao.data_devolucao <= ate))
+    return {"facturacao_kz": str(fact), "devolucoes_kz": str(devol), "facturacao_liquida_kz": str(fact - devol), "recebido_kz": str(recebido), "encomendas_entregues": n, "encomendas_recebidas": recebidas,
             "clientes_compradoras": clientes, "clientes_novas": novos, "ticket_medio_kz": str(svc.kz(fact / n)) if n else None}
 
 
@@ -557,3 +562,76 @@ def relatorios(de: date, ate: date, agrupar: Literal["dia", "semana", "mes"] = "
         "clientes_recorrentes": [{"id": i, "nome": n, "compras": k, "total_kz": str(t)} for i, n, k, t in recorrentes],
         "por_receber": por_receber(db),
     }
+
+
+# --- Devoluções ---------------------------------------------------------------------
+
+class ItemDevolucaoIn(BaseModel):
+    artigo_id: UUID
+    quantidade: Decimal = Field(gt=0, max_digits=14, decimal_places=3)
+    repor_stock: bool = True
+
+
+class DevolucaoIn(BaseModel):
+    itens: list[ItemDevolucaoIn] = Field(min_length=1, max_length=50)
+    motivo: str = Field(min_length=3, max_length=2000)
+    reembolso_kz: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=2)
+    forma_reembolso: Forma | None = None
+
+
+@router.post("/encomendas/{eid}/devolucoes", status_code=201)
+def devolver(eid: UUID, dados: DevolucaoIn, ctx: Contexto = Depends(requer(P.VENDAS_GERIR)), db: Session = Depends(get_db)):
+    """Devolução de produtos de uma encomenda entregue. Produtos em condições voltam ao lote
+    de onde saíram (movimento «devolução»); os outros não regressam ao stock. O valor
+    devolvido reduz a facturação líquida do mês; o reembolso (opcional) é um estorno."""
+    from app.modules.stock import service as stock_svc
+    from app.modules.vendas.models import Devolucao
+    e = _obter(db, eid, bloquear=True)
+    if e.estado != "entregue":
+        raise ErroNegocio("nao_entregue", "Só é possível registar devoluções de encomendas entregues.")
+    ja = {}
+    for d in db.scalars(select(Devolucao).where(Devolucao.encomenda_id == e.id)):
+        for i in d.itens:
+            ja[i["artigo_id"]] = ja.get(i["artigo_id"], Decimal(0)) + Decimal(i["quantidade"])
+    factor_desc = (1 - e.desconto_kz / e.subtotal_kz) if e.subtotal_kz else Decimal(1)
+    linhas = {l.artigo_id: l for l in e.linhas}
+    total, registo = Decimal(0), []
+    for it in dados.itens:
+        l = linhas.get(it.artigo_id)
+        if l is None:
+            raise ErroNegocio("produto_invalido", "Esse produto não faz parte da encomenda.")
+        if it.quantidade + ja.get(str(it.artigo_id), Decimal(0)) > l.quantidade:
+            raise ErroNegocio("quantidade_excessiva", f"Não pode devolver mais do que foi entregue de {l.artigo.nome}.")
+        valor = svc.kz(l.total_kz / l.quantidade * it.quantidade * factor_desc)
+        total += valor
+        registo.append({"artigo_id": str(it.artigo_id), "artigo": l.artigo.nome, "quantidade": str(it.quantidade), "repor_stock": it.repor_stock,
+                        "valor_kz": str(valor)})
+        if it.repor_stock:
+            falta = it.quantidade
+            saidas = db.scalars(select(Movimento).where(Movimento.encomenda_id == e.id, Movimento.artigo_id == it.artigo_id,
+                                                        Movimento.tipo == "saida").order_by(Movimento.id.desc())).unique().all()
+            stock_svc.bloquear_artigo(db, it.artigo_id)
+            for m in saidas:
+                if falta <= 0:
+                    break
+                q = min(-m.quantidade, falta)
+                db.add(Movimento(artigo_id=it.artigo_id, lote_id=m.lote_id, tipo="devolucao", quantidade=q, custo_unitario=m.custo_unitario,
+                                 data_movimento=hoje(), motivo=f"Devolução de {svc.codigo(e)}: {dados.motivo}", referencia=svc.codigo(e),
+                                 encomenda_id=e.id, utilizador_id=ctx.utilizador.id))
+                falta -= q
+    d = Devolucao(encomenda_id=e.id, data_devolucao=hoje(), itens=registo, valor_kz=total, motivo=dados.motivo, registada_por_id=ctx.utilizador.id)
+    db.add(d)
+    db.flush()
+    if dados.reembolso_kz:
+        if not dados.forma_reembolso:
+            raise ErroNegocio("forma_em_falta", "Indique a forma do reembolso.")
+        if dados.reembolso_kz > total:
+            raise ErroNegocio("reembolso_excessivo", f"O reembolso não pode exceder o valor devolvido ({svc.fkz(total)}).")
+        svc.registar_pagamento(db, ctx, e, -dados.reembolso_kz, hoje(), dados.forma_reembolso, None, f"Reembolso de devolução: {dados.motivo}")
+    registar(db, utilizador_id=ctx.utilizador.id, accao="devolucao", entidade="encomenda", entidade_id=e.id,
+             resumo=f"Devolução em {svc.codigo(e)}: {svc.fkz(total)} — {dados.motivo}", ip=ctx.ip)
+    from app.modules.notificacoes.service import notificar_ceo
+    notificar_ceo(db, "devolucao", f"Devolução registada: {svc.codigo(e)}", f"{e.cliente.nome} — {svc.fkz(total)}: {dados.motivo}", "/vendas",
+                  excepto=ctx.utilizador.id)
+    db.commit()
+    return _saida(ctx, db, e, extra=True)

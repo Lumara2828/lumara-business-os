@@ -244,6 +244,40 @@ await luisa.goto(`${BASE}/`);
 await luisa.waitForSelector("text=Facturação (entregues)");
 await foto(luisa, "24-painel-ceo-fase4");
 
+// --- Fase 5: finanças e procedimentos ---
+await diana.goto(`${BASE}/financas`);
+await diana.waitForSelector("text=Propostas de despesa");
+await diana.click("button:has-text('+ Propor despesa')");
+await diana.selectOption("#l-cat", { label: "Matérias-primas" });
+await diana.fill("#l-desc", "E2E: óleo de rícino 2 L");
+await diana.fill("#l-valor", "8000");
+await diana.click("role=dialog >> button:has-text('Propor')");
+await diana.waitForSelector("text=E2E: óleo de rícino 2 L");
+await diana.goto(`${BASE}/procedimentos`);
+await diana.click("text=Contagem semanal");
+await diana.click("role=dialog >> button:has-text('Executar checklist')");
+for (const cb of await diana.locator("role=dialog >> .bg-folha-50 input[type=checkbox]").all()) await cb.check();
+await diana.click("role=dialog >> button:has-text('Registar') >> nth=-1");
+await diana.waitForSelector("role=dialog >> text=Execuções registadas");
+await foto(diana, "25-procedimento-tablet");
+await diana.keyboard.press("Escape");
+
+await luisa.goto(`${BASE}/excepcoes`);
+await luisa.waitForSelector("text=Proposta");
+await luisa.goto(`${BASE}/financas`);
+await luisa.click("role=tab[name='Despesas e receitas']");
+await luisa.click("text=E2E: óleo de rícino 2 L");
+await luisa.click("role=dialog >> button:has-text('Aprovar')");
+await luisa.waitForSelector("role=dialog >> text=Aprovada");
+await luisa.keyboard.press("Escape");
+await luisa.click("role=tab[name='Resultados']");
+await luisa.waitForSelector("text=Demonstração de resultados");
+await foto(luisa, "26-financas-resultados");
+await luisa.click("role=tab[name='Custos por produto']");
+await luisa.waitForSelector("text=Custo de mão-de-obra directa");
+await foto(luisa, "27-custos-produto");
+assert.equal(await maira.goto(`${BASE}/financas`).then(() => maira.locator("text=Finanças e rentabilidade").count()), 0, "Maira não vê as finanças");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

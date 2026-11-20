@@ -78,7 +78,21 @@ Stock disponível = soma dos movimentos (por artigo e por lote); nunca é uma co
 | `eventos` | nome, datas, local, objectivo, orçamento, meta de vendas, responsável, estado, materiais, resultados, contactos | — |
 | `evento_produtos` / `evento_checklist` / `evento_custos` | produtos a levar (planeado/levado/devolvido), checklist, custos | — |
 
-## Fases 5–6 — modelo previsto (não implementado)
+## Fase 5 — implementado (migração `0005`)
+
+| Tabela | Campos principais | Regras |
+|---|---|---|
+| `categorias_financeiras` | nome, tipo (despesa/receita), natureza (incl. `compras_stock`, `investimento`), fixa, activa | nome único |
+| `lancamentos` | número (D-/R-0001), tipo, categoria, descrição, valor, competência, vencimento, estado (proposta/aprovada/paga/rejeitada/anulada), pagamento, fornecedor, evento, campanha, despesa fixa, justificação, decisão, documento | valor > 0; paga ⇒ aprovada e com data; rejeição/anulação ⇒ motivo; uma por despesa fixa e mês |
+| `orcamentos` | ano, mês, categoria, valor | único por mês e categoria |
+| `despesas_fixas` | descrição, categoria, valor, dia de vencimento, activa | dia 1–28 |
+| `devolucoes` | encomenda, data, itens (JSONB), valor, motivo | — |
+| `fichas_tecnicas.outros_custos_unidade_kz` | outros custos atribuíveis por unidade | — |
+| `movimentos_stock` tipo `devolucao` | entrada no lote de origem | sinal positivo |
+| `procedimentos` | código, versão, título, área, objectivo, função responsável, etapas, checklist, materiais, estado, aprovação | (código, versão) único |
+| `execucoes_procedimento` | procedimento (versão), quem, itens cumpridos, completa, observações, tarefa | — |
+
+## Fase 6 — modelo previsto (não implementado)
 
 ```mermaid
 erDiagram

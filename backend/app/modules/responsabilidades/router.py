@@ -77,26 +77,30 @@ class RegraOut(RegraIn):
     actualizada_em: datetime
 
 
-def _lacunas(a: ActividadeRecorrente) -> list[str]:
-    """Verifica os princípios de autonomia: procedimento e indicador definidos."""
+def _lacunas(a: ActividadeRecorrente, db: Session | None = None) -> list[str]:
+    """Verifica os princípios de autonomia: procedimento (aprovado) e indicador definidos."""
     falta = []
     if not a.procedimento_ref:
         falta.append("Sem procedimento documentado")
+    elif db is not None:
+        from app.modules.procedimentos.router import aprovado_por_codigo
+        if aprovado_por_codigo(db, a.procedimento_ref) is None:
+            falta.append(f"Procedimento {a.procedimento_ref} não existe ou não está aprovado")
     if not a.indicador:
         falta.append("Sem indicador de resultado")
     return falta
 
 
-def _saida(a: ActividadeRecorrente) -> ActividadeOut:
+def _saida(a: ActividadeRecorrente, db: Session | None = None) -> ActividadeOut:
     o = ActividadeOut.model_validate(a)
-    o.lacunas = _lacunas(a)
+    o.lacunas = _lacunas(a, db)
     return o
 
 
 @router.get("/actividades", response_model=list[ActividadeOut])
 def actividades(ctx: Contexto = Depends(requer(P.RESPONSABILIDADES_VER)), db: Session = Depends(get_db)):
     q = select(ActividadeRecorrente).order_by(ActividadeRecorrente.area, ActividadeRecorrente.nome)
-    return [_saida(a) for a in db.scalars(q).unique()]
+    return [_saida(a, db) for a in db.scalars(q).unique()]
 
 
 def _validar(db: Session, dados: ActividadeIn):
@@ -116,7 +120,7 @@ def criar_actividade(dados: ActividadeIn, ctx: Contexto = Depends(requer(P.RESPO
              resumo=f"Criou a actividade recorrente «{a.nome}»", ip=ctx.ip)
     db.commit()
     db.refresh(a)
-    return _saida(a)
+    return _saida(a, db)
 
 
 @router.put("/actividades/{aid}", response_model=ActividadeOut)
@@ -134,7 +138,7 @@ def editar_actividade(aid: UUID, dados: ActividadeIn, ctx: Contexto = Depends(re
              resumo=f"Actualizou a actividade «{a.nome}»", alteracoes=diferencas(antes, novos), ip=ctx.ip)
     db.commit()
     db.refresh(a)
-    return _saida(a)
+    return _saida(a, db)
 
 
 # --- Geração das tarefas da semana ---------------------------------------------

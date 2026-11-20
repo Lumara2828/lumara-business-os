@@ -31,6 +31,8 @@ class FichaTecnica(Base):
     validade_dias: Mapped[int | None] = mapped_column(Integer)  # prazo de validade do produto após fabrico
     instrucoes: Mapped[str | None] = mapped_column(Text)
     requisitos_qualidade: Mapped[str | None] = mapped_column(Text)
+    # Ficha de custos (Fase 5): outros custos atribuíveis por unidade (energia, água, etiquetas soltas…).
+    outros_custos_unidade_kz: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     criada_em: Mapped[datetime] = criado_em()

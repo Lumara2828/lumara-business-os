@@ -97,7 +97,10 @@ def evento_saida(ctx: Contexto, ev: Evento, db: Session, detalhe: bool = False) 
         s["vendas"].update(facturacao_kz=str(fact), recebido_kz=str(rec),
                            meta_atingida_pct=str((fact / ev.meta_vendas_kz * 100).quantize(Decimal("0.1"))) if ev.meta_vendas_kz else None)
     if ceo:
-        custos = sum((c.valor_kz for c in ev.custos), Decimal(0))
+        from app.modules.financas.models import Lancamento
+        lanc = db.scalar(select(func.coalesce(func.sum(Lancamento.valor_kz), 0)).where(
+            Lancamento.evento_id == ev.id, Lancamento.tipo == "despesa", Lancamento.estado.in_(("aprovada", "paga")))) or Decimal(0)
+        custos = sum((c.valor_kz for c in ev.custos), Decimal(0)) + lanc
         cpv, sem_custo = Decimal(0), []
         for aid, q in vend.items():
             a = db.get(Artigo, aid)

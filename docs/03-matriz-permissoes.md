@@ -50,6 +50,14 @@ Fonte de verdade: `backend/app/core/permissions.py` (testada em `tests/test_perm
 | Ver eventos; marcar itens da checklist atribuídos | ● | ● | ● |
 | Criar/gerir eventos | ● | ● | |
 | Registar quantidades levadas/devolvidas num evento | ● | ● | ● |
+| **Fase 5 — Finanças e Procedimentos** | | | |
+| Propor despesas (vê só as suas propostas) | ● | ● | ● |
+| Aprovar/rejeitar/pagar/anular despesas; orçamento; despesas fixas | ● | ✖ | ✖ |
+| Resultados, fluxo de caixa, custos por produto, margens | ● | ✖ | ✖ |
+| Parâmetros financeiros (custo/hora, meta de facturação, margem mínima) | ● | ✖ | ✖ |
+| Registar devoluções | ● | ● | |
+| Consultar procedimentos; redigir rascunhos; executar checklists | ● | ● | ● |
+| Aprovar procedimentos | ● | | |
 | **Fases seguintes (já declaradas)** | | | |
 | Vendas e clientes (CRM) | ● | ● | |
 | **Dados financeiros confidenciais** | ● | ✖ | ✖ |

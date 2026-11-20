@@ -7,11 +7,13 @@ import Definicoes from "./pages/Definicoes";
 import Equipa from "./pages/Equipa";
 import Eventos from "./pages/Eventos";
 import Excepcoes from "./pages/Excepcoes";
+import Financas from "./pages/Financas";
 import Login from "./pages/Login";
 import Marketing from "./pages/Marketing";
 import Notificacoes from "./pages/Notificacoes";
 import Ocorrencias from "./pages/Ocorrencias";
 import Painel from "./pages/Painel";
+import Procedimentos from "./pages/Procedimentos";
 import Producao from "./pages/Producao";
 import Responsabilidades from "./pages/Responsabilidades";
 import Rotina from "./pages/Rotina";
@@ -40,6 +42,8 @@ export default function App() {
         <Route path="marketing" element={<Protegida permissao="marketing.calendario"><Marketing /></Protegida>} />
         <Route path="producao" element={<Protegida permissao="stock.ver"><Producao /></Protegida>} />
         <Route path="stock" element={<Protegida permissao="stock.ver"><Stock /></Protegida>} />
+        <Route path="financas" element={<Protegida permissao="despesas.propor"><Financas /></Protegida>} />
+        <Route path="procedimentos" element={<Protegida permissao="procedimentos.ver"><Procedimentos /></Protegida>} />
         <Route path="ocorrencias" element={<Ocorrencias />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />
         <Route path="notificacoes" element={<Notificacoes />} />

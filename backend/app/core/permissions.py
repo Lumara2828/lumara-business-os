@@ -54,6 +54,9 @@ class P(StrEnum):
     ENCOMENDAS_PREPARAR = "encomendas.preparar"    # ver encomendas (sem valores) e prepará-las
     EVENTOS_VER = "eventos.ver"
     EVENTOS_GERIR = "eventos.gerir"
+    # --- Fase 5: finanças e procedimentos ---
+    DESPESAS_PROPOR = "despesas.propor"            # propor uma despesa (vê só as suas propostas)
+    PROCEDIMENTOS_EDITAR = "procedimentos.editar"  # redigir procedimentos e registar execuções
     # --- Fases seguintes (declaradas, sem endpoints ainda) ---
     FINANCAS_VER = "financas.ver"
     FINANCAS_APROVAR_DESPESAS = "financas.aprovar_despesas"
@@ -70,6 +73,8 @@ _COMUNS = {
     P.PROCEDIMENTOS_VER,
     P.STOCK_VER,
     P.EVENTOS_VER,
+    P.DESPESAS_PROPOR,
+    P.PROCEDIMENTOS_EDITAR,
 }
 
 MATRIZ: dict[Funcao, frozenset[P]] = {

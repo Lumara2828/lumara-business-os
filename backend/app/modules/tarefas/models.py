@@ -62,6 +62,7 @@ class Tarefa(Base):
     categoria = relationship("CategoriaTarefa", lazy="joined")
     responsavel = relationship("Utilizador", foreign_keys=[responsavel_id], lazy="joined")
     criado_por = relationship("Utilizador", foreign_keys=[criado_por_id], lazy="joined")
+    actividade = relationship("ActividadeRecorrente", lazy="joined")
 
     __table_args__ = (
         CheckConstraint("data_inicio IS NULL OR data_inicio <= prazo", name="tarefa_inicio_antes_prazo"),

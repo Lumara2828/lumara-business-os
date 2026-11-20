@@ -82,6 +82,7 @@ def para_saida(ctx: Contexto, t: Tarefa, n_comentarios: int = 0, n_anexos: int =
         estado=t.estado, requer_aprovacao=t.requer_aprovacao, motivo_bloqueio=t.motivo_bloqueio,
         resultado_esperado=t.resultado_esperado, concluida_em=t.concluida_em, submetida_em=t.submetida_em,
         aprovada_em=t.aprovada_em, actividade_recorrente_id=t.actividade_recorrente_id,
+        procedimento_ref=t.actividade.procedimento_ref if t.actividade else None,
         em_atraso=em_atraso(t), dias_atraso=dias_atraso(t), concluida_no_prazo=concluida_no_prazo(t),
         n_comentarios=n_comentarios, n_anexos=n_anexos, versao=t.versao, is_demo=t.is_demo,
         permissoes=permissoes(ctx, t),

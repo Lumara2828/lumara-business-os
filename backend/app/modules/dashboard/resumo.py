@@ -29,6 +29,7 @@ def resumo_executivo(db: Session) -> dict:
     abertas = db.scalars(select(Tarefa).where(Tarefa.estado != "concluida")).unique().all()
     ocorrencias = db.scalars(select(Ocorrencia).where(Ocorrencia.estado != "resolvida")).unique().all()
 
+    from app.modules.vendas.service import fkz
     # 1. Como está a Lumara?
     taxa = ind["taxa_cumprimento"]
     if taxa is None:
@@ -44,8 +45,11 @@ def resumo_executivo(db: Session) -> dict:
     from app.modules.vendas.router import indicadores
     from app.modules.vendas.service import fkz
     v = indicadores(db, ini, fim)
-    estado += (f" Vendas do mês: {v['encomendas_entregues']} encomenda(s) entregue(s), facturação {fkz(v['facturacao_kz'])}, "
-               f"recebido {fkz(v['recebido_kz'])}. Despesas e resultado ficam disponíveis com as Finanças (Fase 5).")
+    from app.modules.financas import service as fin_
+    rr = fin_.resultados(db, d.year, d.month)
+    estado += (f" Vendas do mês: {v['encomendas_entregues']} encomenda(s) entregue(s), facturação líquida {fkz(rr['facturacao_liquida_kz'])}, "
+               f"recebido {fkz(v['recebido_kz'])}; resultado do mês até agora {fkz(rr['resultado_kz'])}"
+               + (" (incompleto: há vendas de produtos sem custo registado)." if not rr["completo"] else "."))
 
     # 2. O que está a correr bem?
     bem = []
@@ -83,8 +87,18 @@ def resumo_executivo(db: Session) -> dict:
     for aid, q in perdas_stock:
         a = db.get(_Artigo, aid)
         perdas.append(f"Perdas de stock este mês: {stock_svc.fmt_qtd(-q, a.unidade)} de {a.nome}.")
-    perdas_nota = ("Margens e resultado ficam disponíveis com o módulo de Finanças (Fase 5). Abaixo: perdas de stock "
-                   "registadas este mês e ocorrências com possível impacto financeiro.")
+    from app.modules.financas import service as fin
+    for p in fin.ficha_custos(db):
+        if p["alerta"]:
+            perdas.append(f"{p['produto']['nome']}: {p['alerta']} (preço {p['preco_kz']} Kz, custo {p['custo_total_kz']} Kz).")
+    for o in fin.orcamento_vs_real(db, d.year, d.month):
+        if o["excedido"]:
+            perdas.append(f"Orçamento de «{o['categoria']['nome']}» excedido: {o['realizado_kz']} de {o['orcamento_kz']} Kz.")
+    r = fin.resultados(db, d.year, d.month)
+    if r["devolucoes_kz"] != "0.00":
+        perdas.append(f"Devoluções este mês: {fkz(r['devolucoes_kz'])}.")
+    perdas_nota = (f"Resultado do mês até agora: {fkz(r['resultado_kz'])} (facturação líquida {fkz(r['facturacao_liquida_kz'])}, "
+                   f"despesas {fkz(r['despesas_total_kz'])}, custo dos produtos vendidos {fkz(r['custo_mercadorias_vendidas_kz'])}).")
 
     # 5. O que precisa da intervenção da CEO?
     intervencao = []
@@ -104,6 +118,17 @@ def resumo_executivo(db: Session) -> dict:
     n_camp = db.scalar(select(func.count()).where(Campanha.estado == "proposta")) or 0
     if n_camp:
         intervencao.append(f"{n_camp} campanha(s) proposta(s) a aguardar decisão.")
+    from app.modules.financas.models import Lancamento
+    from app.modules.procedimentos.models import Procedimento
+    n_prop = db.scalar(select(func.count()).where(Lancamento.estado == "proposta")) or 0
+    if n_prop:
+        intervencao.append(f"{n_prop} despesa(s) proposta(s) a aguardar a sua decisão.")
+    n_venc = db.scalar(select(func.count()).where(Lancamento.estado == "aprovada", Lancamento.data_vencimento < d)) or 0
+    if n_venc:
+        intervencao.append(f"{n_venc} conta(s) a pagar vencida(s).")
+    n_pop = db.scalar(select(func.count()).where(Procedimento.estado == "em_aprovacao")) or 0
+    if n_pop:
+        intervencao.append(f"{n_pop} procedimento(s) a aguardar aprovação.")
     from app.modules.vendas.models import Encomenda
     n_desc = db.scalar(select(func.count()).where(Encomenda.desconto_requer_aprovacao.is_(True), Encomenda.estado != "cancelada")) or 0
     if n_desc:

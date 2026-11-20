@@ -13,3 +13,6 @@ from app.modules.stock.models import Artigo, Fornecedor, Lote, Movimento  # noqa
 from app.modules.marketing.models import Campanha, ComentarioConteudo, Conteudo, InteracaoIA, MediaConteudo  # noqa: F401,E402
 from app.modules.eventos.models import Evento, EventoCusto, EventoProduto, EventoTarefa  # noqa: F401,E402
 from app.modules.vendas.models import Cliente, Encomenda, LinhaEncomenda, Pagamento, Preco  # noqa: F401,E402
+from app.modules.financas.models import CategoriaFinanceira, DespesaFixa, Lancamento, Orcamento  # noqa: F401,E402
+from app.modules.procedimentos.models import ExecucaoProcedimento, Procedimento  # noqa: F401,E402
+from app.modules.vendas.models import Devolucao  # noqa: F401,E402

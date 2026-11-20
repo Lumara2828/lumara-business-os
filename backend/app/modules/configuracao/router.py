@@ -19,6 +19,9 @@ LIMITES = {
     "limite_desconto_pct": (0, 100),
     "dias_cobranca": (1, 90),
     "dias_cliente_inactivo": (15, 730),
+    "custo_mao_obra_hora_kz": (0, 10_000_000),
+    "meta_facturacao_mensal_kz": (0, 100_000_000_000),
+    "margem_minima_pct": (0, 100),
     "dia_planeamento": (0, 6),
     "dia_revisao": (0, 6),
 }
@@ -28,13 +31,19 @@ class ValorIn(BaseModel):
     valor: int | float | str
 
 
+FINANCEIROS = {"custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct"}
+
+
 @router.get("")
 def listar(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
-    return service.listar(db)
+    itens = service.listar(db)
+    return itens if ctx.pode(P.FINANCAS_VER) else [i for i in itens if i["chave"] not in FINANCEIROS]
 
 
 @router.put("/{chave}")
 def definir(chave: str, dados: ValorIn, ctx: Contexto = Depends(requer(P.CONFIGURACAO_GERIR)), db: Session = Depends(get_db)):
+    if chave in ("custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct") and not ctx.pode(P.FINANCAS_VER):
+        raise ErroNegocio("sem_permissao", "Parâmetro financeiro reservado à CEO.", 403)
     if chave not in LIMITES:
         raise ErroNegocio("chave_invalida", "Este parâmetro não pode ser alterado.")
     minimo, maximo = LIMITES[chave]

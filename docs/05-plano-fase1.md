@@ -107,5 +107,29 @@ Suposições da Fase 4:
 - Os preços DEMO são fictícios e marcados como tal.
 - Os relatórios de vendas (sem custos) são visíveis à Maira, que gere as vendas; custos, margens e orçamentos só à CEO.
 
+## Fase 5 — Finanças e Procedimentos (implementada)
+
+| # | Entrega | Estado |
+|---|---|---|
+| 1 | Categorias financeiras (fixas/variáveis, natureza), lançamentos de despesas e outras receitas, com factura anexa | ✅ |
+| 2 | Propostas de despesa pelas colaboradoras (vêem só as suas); aprovação, rejeição, pagamento e anulação só pela CEO | ✅ |
+| 3 | Contas a pagar, vencimentos e alertas de contas vencidas | ✅ |
+| 4 | Orçamento mensal por categoria, orçamento vs realizado, «despesas fora do orçamento» na Central de Excepções | ✅ |
+| 5 | Despesas fixas com geração mensal idempotente | ✅ |
+| 6 | Ficha de custos por produto: matérias-primas + embalagens + mão-de-obra directa + outros; margem bruta e % (só com custos completos) | ✅ |
+| 7 | Demonstração de resultados mensal: facturação, devoluções, custo dos produtos vendidos, margem bruta, despesas (fixas/variáveis), perdas, resultado, margem de lucro; compras para stock e investimentos fora do resultado | ✅ |
+| 8 | Fluxo de caixa do mês, série de 12 meses, previsão de facturação do mês, meta de facturação | ✅ |
+| 9 | Devoluções: reposição no lote de origem, reembolso por estorno, redução da facturação líquida | ✅ |
+| 10 | Procedimentos (POP): versões, aprovação pela CEO, obsoletos, checklists e registo de execuções; ligação à matriz de responsabilidades e às tarefas recorrentes | ✅ |
+| 11 | Dashboard (despesas, resultado, margem de lucro, meta), resumo automático («onde estamos a perder dinheiro»), excepções e alertas | ✅ |
+| 12 | Testes: +7 de integração (65 no total) e ponta-a-ponta (proposta de despesa → aprovação; execução de procedimento) | ✅ |
+
+Suposições da Fase 5:
+- **Competência vs caixa**: uma despesa conta no resultado do mês a que pertence (data de competência), mesmo que seja paga noutro mês; o fluxo de caixa usa a data de pagamento.
+- **Compras para stock** (matérias-primas, embalagens) não são despesa do mês: entram no resultado como «custo dos produtos vendidos», pelo custo registado em cada saída de venda. **Investimentos** (equipamentos) ficam fora do resultado.
+- Custos de eventos registam-se **ou** no evento **ou** como lançamento com o evento associado — não nos dois.
+- Margens só são calculadas com custos completos; com custos em falta, o sistema mostra «incompleto» em vez de um número enganador.
+- Os dados DEMO não têm custos reais; a despesa DEMO é fictícia e está marcada.
+
 ## Próximas fases (resumo)
- **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.
+- **Fase 6** integrações (Instagram/Facebook, WhatsApp Business, Canva, Metricool, Make), assistente de gestão com IA sobre os dados autorizados, relatórios inteligentes e automações.

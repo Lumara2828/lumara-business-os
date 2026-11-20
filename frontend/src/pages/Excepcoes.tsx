@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { Tarefa } from "../api/types";
 import { useToast } from "../components/Toast";
 import { Carregando, ErroCaixa, PrioridadeBadge, Vazio } from "../components/ui";
-import { fData, fQtd, relativo } from "../lib/formato";
+import { fData, fMoeda, fQtd, relativo } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 interface OccItem { id: string; numero: number; tipo_rotulo: string; gravidade: string; estado: string; titulo: string; descricao: string; reportada_por: string; criada_em: string }
@@ -16,7 +16,11 @@ interface Dados { total: number; dias_atraso_alerta_ceo: number; data: string; s
   lotes_expirados: { id: string; numero: string; artigo: string; validade: string; saldo: string; unidade: string }[];
   conteudos_aprovacao: { id: string; codigo: string; tema: string; plataforma: string; data_publicacao: string; responsavel: string }[];
   campanhas_aprovacao: { id: string; nome: string; data_inicio: string; data_fim: string; responsavel: string }[];
-  encomendas_alerta: { id: string; codigo: string; cliente: string; motivo: string }[] } }
+  encomendas_alerta: { id: string; codigo: string; cliente: string; motivo: string }[];
+  financas: { orcamento_excedido: { categoria: string; orcamento_kz: string; realizado_kz: string; utilizacao_pct: string }[];
+    despesas_propostas: LinF[]; contas_vencidas: LinF[] };
+  procedimentos_aprovacao: { id: string; codigo: string; versao: number; titulo: string; criado_por: string }[] } }
+interface LinF { id: string; codigo: string; descricao: string; valor_kz: string; categoria: string; proposto_por: string; data_vencimento: string | null }
 
 export default function Excepcoes() {
   const toast = useToast();
@@ -69,7 +73,21 @@ export default function Excepcoes() {
               <span>{l.artigo.replace(/^\[DEMO\] /, "")} · lote {l.numero}</span><span className="text-alerta">{fQtd(l.saldo, l.unidade)} · expirou {fData(l.validade)}</span></li>)}</ul>)}
         </Bloco>
         <BlocoOcc titulo="Reclamações" itens={s.reclamacoes} />
-        <BlocoOcc titulo="Despesas fora do orçamento" itens={s.despesas_fora_orcamento} nota="Até à Fase 5 (Finanças), comunicadas como ocorrências." />
+        <Bloco titulo="Despesas a decidir e fora do orçamento" n={s.financas.despesas_propostas.length + s.financas.orcamento_excedido.length + s.financas.contas_vencidas.length + s.despesas_fora_orcamento.length}>
+          {s.financas.despesas_propostas.length + s.financas.orcamento_excedido.length + s.financas.contas_vencidas.length + s.despesas_fora_orcamento.length === 0 ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">
+              {s.financas.despesas_propostas.map((l) => <li key={l.id}><Link to="/financas" className="block py-2 hover:underline">Proposta {l.codigo}: {l.descricao.replace(/^\[DEMO\] /, "")} — {fMoeda(l.valor_kz)}
+                <span className="block text-xs text-terra-700">{l.proposto_por} · {l.categoria}</span></Link></li>)}
+              {s.financas.orcamento_excedido.map((o) => <li key={o.categoria} className="py-2 text-alerta">Orçamento excedido em «{o.categoria}»: {fMoeda(o.realizado_kz)} de {fMoeda(o.orcamento_kz)} ({o.utilizacao_pct.replace(".", ",")}%)</li>)}
+              {s.financas.contas_vencidas.map((l) => <li key={l.id}><Link to="/financas" className="block py-2 hover:underline text-alerta">Conta vencida a {fData(l.data_vencimento)}: {l.descricao.replace(/^\[DEMO\] /, "")} — {fMoeda(l.valor_kz)}</Link></li>)}
+              {s.despesas_fora_orcamento.map((o) => <li key={o.id}><Link to="/ocorrencias" className="block py-2 hover:underline">O-{String(o.numero).padStart(4, "0")} · {o.titulo}</Link></li>)}
+            </ul>)}
+        </Bloco>
+        <Bloco titulo="Procedimentos a aprovar" n={s.procedimentos_aprovacao.length}>
+          {!s.procedimentos_aprovacao.length ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">{s.procedimentos_aprovacao.map((p) => <li key={p.id}><Link to={`/procedimentos?abrir=${p.id}`} className="block py-2 hover:underline">
+              {p.codigo} v{p.versao} · {p.titulo.replace(/^\[DEMO\] /, "")}<span className="block text-xs text-terra-700">{p.criado_por}</span></Link></li>)}</ul>)}
+        </Bloco>
         <Bloco titulo="Encomendas problemáticas" n={s.encomendas_alerta.length + s.encomendas_problematicas.length}>
           {s.encomendas_alerta.length + s.encomendas_problematicas.length === 0 ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
             <ul className="divide-y divide-linho/60 text-sm">
