@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -29,8 +29,9 @@ MODULOS = [
     {"modulo": "Central de Excepções", "fase": 1, "estado": "activo"},
     {"modulo": "Produção", "fase": 2, "estado": "activo"},
     {"modulo": "Stock e Inventário", "fase": 2, "estado": "activo"},
-    {"modulo": "Marketing e Conteúdos com IA", "fase": 3, "estado": "planeado"},
-    {"modulo": "Eventos e Campanhas", "fase": 3, "estado": "planeado"},
+    {"modulo": "Marketing e Conteúdos com IA", "fase": 3, "estado": "activo"},
+    {"modulo": "Campanhas", "fase": 3, "estado": "activo"},
+    {"modulo": "Eventos e feiras", "fase": 4, "estado": "planeado"},
     {"modulo": "Vendas e Clientes", "fase": 4, "estado": "planeado"},
     {"modulo": "Finanças e Rentabilidade", "fase": 5, "estado": "planeado"},
     {"modulo": "Procedimentos e Documentação", "fase": 5, "estado": "planeado"},
@@ -63,8 +64,28 @@ def executivo(
         "resumo": resumo_executivo(db),
         "stock": _stock_resumo(db),
         "producao": producao_svc.estado_producao(db),
+        "marketing": _marketing_resumo(db, ini, fim),
         "modulos": MODULOS,
         "gerado_em": agora(),
+    }
+
+
+def _marketing_resumo(db: Session, ini, fim) -> dict:
+    from app.modules.marketing.models import Campanha, Conteudo
+    lista = db.scalars(select(Conteudo).where(Conteudo.data_publicacao >= ini, Conteudo.data_publicacao <= fim)).unique().all()
+    pub = [c for c in lista if c.estado in ("publicado", "analisado")]
+    passados = [c for c in lista if c.data_publicacao < hoje()]
+    com_m = [c for c in pub if c.metricas]
+    alcance = sum(c.metricas.get("alcance", 0) or 0 for c in com_m)
+    inter = sum(sum(c.metricas.get(k, 0) or 0 for k in ("gostos", "comentarios", "partilhas", "guardados")) for c in com_m)
+    return {
+        "planeados": len(lista), "publicados": len(pub),
+        "execucao_pct": round(100 * sum(1 for c in passados if c.estado in ("publicado", "analisado")) / len(passados), 1) if passados else None,
+        "em_revisao": db.scalar(select(func.count()).where(Conteudo.estado == "revisao")) or 0,
+        "atrasados": sum(1 for c in passados if c.estado not in ("publicado", "analisado")),
+        "alcance": alcance, "envolvimento_pct": round(100 * inter / alcance, 2) if alcance else None,
+        "publicados_sem_metricas": sum(1 for c in pub if not c.metricas),
+        "campanhas_activas": db.scalar(select(func.count()).where(Campanha.estado == "activa")) or 0,
     }
 
 
@@ -98,7 +119,21 @@ def pessoal(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_
         "bloqueadas": [tarefas.para_saida(ctx, t) for t in minhas if t.estado == "bloqueada"],
         "aguardar_aprovacao": [tarefas.para_saida(ctx, t) for t in minhas if t.estado == "aguardar_aprovacao"],
         "stock": _stock_resumo(db) if ctx.pode(P.STOCK_MOVIMENTAR) else None,
+        "marketing": _marketing_resumo(db, ini, fim) if ctx.pode(P.MARKETING_CALENDARIO) else None,
     }
+
+
+def _conteudos_revisao(db: Session) -> list[dict]:
+    from app.modules.marketing.models import Conteudo
+    return [{"id": str(c.id), "codigo": f"C-{c.numero:04d}", "tema": c.tema, "plataforma": c.plataforma,
+             "data_publicacao": c.data_publicacao, "responsavel": c.responsavel.nome, "submetido_em": c.submetido_em}
+            for c in db.scalars(select(Conteudo).where(Conteudo.estado == "revisao").order_by(Conteudo.data_publicacao)).unique()]
+
+
+def _campanhas_propostas(db: Session) -> list[dict]:
+    from app.modules.marketing.models import Campanha
+    return [{"id": str(k.id), "nome": k.nome, "data_inicio": k.data_inicio, "data_fim": k.data_fim, "responsavel": k.responsavel.nome}
+            for k in db.scalars(select(Campanha).where(Campanha.estado == "proposta").order_by(Campanha.data_inicio)).unique()]
 
 
 @router.get("/excepcoes")
@@ -151,6 +186,8 @@ def excepcoes(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = De
         "encomendas_problematicas": occ({"encomenda_problematica"}),
         "outras_ocorrencias": occ({"outro"}),
         "desvios_metas": desvios,
+        "conteudos_aprovacao": _conteudos_revisao(db),
+        "campanhas_aprovacao": _campanhas_propostas(db),
     }
     total = sum(len(v) for v in seccoes.values())
     return {"total": total, "dias_atraso_alerta_ceo": dias_ceo, "seccoes": seccoes, "data": formatar_data(d)}

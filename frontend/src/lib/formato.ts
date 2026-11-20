@@ -113,3 +113,20 @@ export function fQtd(v: string | number | null | undefined, unidade?: string): s
   const s = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 3 }).format(Number(v));
   return unidade ? `${s} ${UNIDADES[unidade] ?? unidade}` : s;
 }
+
+export const PLATAFORMAS: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", whatsapp: "WhatsApp", outro: "Outro" };
+export const CATEGORIAS_CONTEUDO: Record<string, string> = { educativo: "Educativo", produto: "Produto", bastidores: "Bastidores",
+  testemunhos: "Testemunhos", promocoes: "Promoções", eventos: "Eventos" };
+export const FORMATOS: Record<string, string> = { post: "Post", carrossel: "Carrossel", reel: "Reel", story: "Story", video: "Vídeo", live: "Live", outro: "Outro" };
+export const ESTADOS_CONTEUDO: { valor: string; rotulo: string; classe: string }[] = [
+  { valor: "ideia", rotulo: "Ideia", classe: "bg-areia text-terra-700" },
+  { valor: "planeamento", rotulo: "Planeamento", classe: "bg-areia text-terra-700" },
+  { valor: "criacao", rotulo: "Criação", classe: "bg-folha-100 text-folha-700" },
+  { valor: "revisao", rotulo: "Revisão", classe: "bg-amber-100 text-aviso" },
+  { valor: "aprovado", rotulo: "Aprovado", classe: "bg-folha-100 text-folha-700" },
+  { valor: "agendado", rotulo: "Agendado", classe: "bg-folha-300/40 text-folha-700" },
+  { valor: "publicado", rotulo: "Publicado", classe: "bg-folha-600 text-white" },
+  { valor: "analisado", rotulo: "Analisado", classe: "bg-cacau/80 text-white" },
+];
+export const COR_CATEGORIA: Record<string, string> = { educativo: "#5e7153", produto: "#9c6644", bastidores: "#8c7b6b",
+  testemunhos: "#b08968", promocoes: "#c08a2e", eventos: "#47573f" };

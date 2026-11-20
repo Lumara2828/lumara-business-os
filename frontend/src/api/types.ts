@@ -80,3 +80,17 @@ export interface Ordem { id: string; numero: number; codigo: string; estado: "pl
   movimentos?: Movimento[]; nao_conformidades?: NaoConformidade[] }
 export interface NaoConformidade { id: string; ordem_id: string | null; lote_id: string | null; descricao: string; gravidade: Prioridade;
   accao_correctiva: string | null; estado: string; reportada_por: string; criada_em: string; resolvida_em: string | null }
+
+// --- Fase 3: marketing ---
+export type EstadoConteudo = "ideia" | "planeamento" | "criacao" | "revisao" | "aprovado" | "agendado" | "publicado" | "analisado";
+export interface Alerta { expressao: string; mensagem: string }
+export interface Conteudo { id: string; numero: number; codigo: string; data_publicacao: string; hora_publicacao: string | null;
+  plataforma: string; categoria: string; formato: string; tema: string; objectivo: string | null; texto: string | null; hashtags: string | null;
+  cta: string | null; notas_producao: string | null; responsavel: UtilizadorResumo; estado: EstadoConteudo; estado_rotulo: string;
+  campanha: { id: string; nome: string } | null; aprovado_em: string | null; submetido_em: string | null; publicado_em: string | null;
+  link_publicacao: string | null; metricas: Record<string, number | null> | null; envolvimento_pct: number | null; origem: string;
+  ia_assistido: boolean; versao: number; is_demo: boolean; atrasado: boolean; alertas: Alerta[]; n_media: number; n_comentarios: number;
+  permissoes: { editar: boolean; mudar_estado: boolean; aprovar: boolean; eliminar: boolean } }
+export interface Campanha { id: string; nome: string; objectivo: string; publico_alvo: string | null; mensagem_chave: string | null;
+  canais: string[]; data_inicio: string; data_fim: string; estado: string; responsavel: { id: string; nome: string };
+  aprovada_em: string | null; resultados: string | null; conteudos: number; conteudos_publicados: number; is_demo: boolean; orcamento_kz: string | null }

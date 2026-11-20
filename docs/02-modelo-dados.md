@@ -55,7 +55,17 @@ erDiagram
 
 Stock disponível = soma dos movimentos (por artigo e por lote); nunca é uma coluna editável.
 
-## Fases 3–6 — modelo previsto (não implementado)
+## Fase 3 — implementado (migração `0003`)
+
+| Tabela | Campos principais | Regras |
+|---|---|---|
+| `conteudos` | numero (C-0001), data/hora de publicação, plataforma, categoria, formato, tema, objectivo, texto, hashtags, cta, notas_producao, responsavel_id, estado (8), campanha_id, aprovado_por/em, submetido_em, publicado_em, link, metricas (JSONB), origem (`manual`/`importacao`/`ia`), ia_assistido, lote_importacao | **CHECK: aprovado/agendado/publicado/analisado ⇒ aprovado_em** |
+| `comentarios_conteudo` | conteudo_id, autor_id, tipo (comentário/submissão/rejeição/aprovação), texto | — |
+| `media_conteudo` | conteudo_id, ficheiro (bytea), tipo, tamanho | — |
+| `campanhas` | nome, objectivo, público, mensagem-chave, canais, datas, orcamento_kz, estado, responsável, aprovação, resultados | datas válidas; orçamento ≥ 0 |
+| `interacoes_ia` | utilizador, tipo, pedido, resposta, estado (ok/recusa/erro), fornecedor, modelo, tokens | auditoria e custo |
+
+## Fases 4–6 — modelo previsto (não implementado)
 
 ```mermaid
 erDiagram

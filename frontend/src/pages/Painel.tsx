@@ -31,6 +31,27 @@ interface Executivo {
   gerado_em: string;
   stock: StockResumo;
   producao: { planeadas: number; em_curso: number; atrasadas: number; nao_conformidades_abertas: number };
+  marketing: MarketingResumo;
+}
+
+interface MarketingResumo { planeados: number; publicados: number; execucao_pct: number | null; em_revisao: number; atrasados: number;
+  alcance: number; envolvimento_pct: number | null; publicados_sem_metricas: number; campanhas_activas: number }
+
+function CartaoMarketing({ m }: { m: MarketingResumo }) {
+  const v = (r: string, x: React.ReactNode, cls = "") => <div><p className="text-xs text-terra-700">{r}</p><p className={`font-serif text-2xl ${cls}`}>{x}</p></div>;
+  return (
+    <Seccao titulo="Desempenho do marketing (mês)" accao={<Link to="/marketing" className="text-sm text-folha-700 hover:underline">Ver marketing</Link>}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+        {v("Publicados / planeados", `${m.publicados}/${m.planeados}`)}
+        {v("Cumprimento do calendário", m.execucao_pct === null ? "—" : `${m.execucao_pct}%`)}
+        {v("A aguardar aprovação", m.em_revisao, m.em_revisao ? "text-aviso" : "")}
+        {v("Atrasados", m.atrasados, m.atrasados ? "text-alerta" : "")}
+        {v("Alcance", m.alcance ? m.alcance.toLocaleString("pt-PT") : "—")}
+        {v("Envolvimento", m.envolvimento_pct === null ? "—" : `${m.envolvimento_pct.toLocaleString("pt-PT")}%`)}
+      </div>
+      {m.publicados_sem_metricas > 0 && <p className="text-xs text-terra-700 mt-2">{m.publicados_sem_metricas} publicação(ões) sem métricas registadas.</p>}
+    </Seccao>
+  );
 }
 
 interface StockResumo { abaixo_minimo: { id: string; nome: string; categoria: string; unidade: string; disponivel: string; stock_minimo: string; ruptura: boolean }[];
@@ -183,6 +204,7 @@ function PainelExecutivo() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
+        <CartaoMarketing m={d.marketing} />
         <Seccao titulo="Próximos prazos (7 dias)" accao={<Link to="/tarefas" className="text-sm text-folha-700 hover:underline">Ver tarefas</Link>}>
           <ListaTarefas tarefas={d.proximos_prazos} vazio="Sem prazos nos próximos 7 dias." />
         </Seccao>
@@ -234,6 +256,7 @@ interface Pessoal {
   estado_actual: EstadoActual; mes: Indicadores; meta_cumprimento: number;
   em_atraso: Tarefa[]; hoje: Tarefa[]; esta_semana: Tarefa[]; bloqueadas: Tarefa[]; aguardar_aprovacao: Tarefa[];
   stock: StockResumo | null;
+  marketing: MarketingResumo | null;
 }
 
 function PainelPessoal() {
@@ -262,6 +285,7 @@ function PainelPessoal() {
         <Seccao titulo="Para hoje"><ListaTarefas tarefas={d.hoje} vazio="Sem prazos para hoje." /></Seccao>
         <Seccao titulo="Esta semana"><ListaTarefas tarefas={d.esta_semana} vazio="Sem prazos nos próximos dias." /></Seccao>
         {d.stock && <CartaoStock s={d.stock} />}
+        {d.marketing && <CartaoMarketing m={d.marketing} />}
         <Seccao titulo="À espera de alguém">
           {d.bloqueadas.length + d.aguardar_aprovacao.length === 0 ? <Vazio titulo="Nada parado" texto="Sem tarefas bloqueadas ou a aguardar aprovação." /> :
             <ListaTarefas tarefas={[...d.bloqueadas, ...d.aguardar_aprovacao]} vazio="" />}
@@ -270,6 +294,7 @@ function PainelPessoal() {
       <div className="flex gap-2 flex-wrap">
         <Link to="/tarefas" className="btn-primario">Ver as minhas tarefas</Link>
         {d.stock && <Link to="/producao" className="btn-secundario">Ordens de produção</Link>}
+        {d.marketing && <Link to="/marketing" className="btn-secundario">Calendário editorial</Link>}
         <Link to="/ocorrencias" className="btn-secundario">Comunicar uma ocorrência</Link>
       </div>
     </div>

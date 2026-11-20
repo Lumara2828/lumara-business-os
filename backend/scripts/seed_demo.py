@@ -47,6 +47,8 @@ def limpar(db):
     db.execute(text("DELETE FROM fichas_tecnicas WHERE is_demo"))
     db.execute(text("DELETE FROM artigos WHERE is_demo"))
     db.execute(text("DELETE FROM fornecedores WHERE is_demo"))
+    db.execute(text("DELETE FROM conteudos WHERE is_demo"))
+    db.execute(text("DELETE FROM campanhas WHERE is_demo"))
     db.execute(delete(Ocorrencia).where(Ocorrencia.is_demo.is_(True)))
     db.execute(delete(Tarefa).where(Tarefa.is_demo.is_(True)))
     db.execute(delete(ActividadeRecorrente).where(ActividadeRecorrente.is_demo.is_(True)))
@@ -170,6 +172,7 @@ def semear(db):
     db.add(ComentarioTarefa(tarefa_id=t.id, autor_id=mai, tipo="submissao", texto="Guião pronto, segue em anexo para revisão."))
     db.flush()
     semear_producao(db, u["producao"], u["ceo"])
+    semear_marketing(db, u["marketing"], u["ceo"])
     db.commit()
     print("Dados DEMO criados.")
     for nome, email, funcao, _ in USERS:
@@ -237,6 +240,44 @@ def semear_producao(db, diana, luisa):
     prod.concluir(db, ctx, feita, D(28), numero_lote=None, validade=None, notas="Duas unidades com vedação defeituosa.")
     db.add(OrdemProducao(ficha_id=ficha.id, produto_id=ficha.produto_id, quantidade_planeada=D(20), responsavel_id=diana.id,
                          data_inicio=d, data_prevista=d + timedelta(days=2), criado_por_id=luisa.id, is_demo=True))
+    db.flush()
+
+
+def semear_marketing(db, maira, luisa):
+    """Fase 3 — conteúdos e campanha DEMO em vários estados do fluxo. Sem métricas inventadas."""
+    from app.core.tempo import agora
+    from app.modules.marketing.models import Campanha, Conteudo
+    d = hoje()
+    camp = Campanha(nome="[DEMO] Kits de autocuidado para as festas", objectivo="Dar a conhecer os kits de autocuidado como presente.",
+                    publico_alvo="Clientes actuais e seguidoras em Luanda", mensagem_chave="Oferecer cuidado é oferecer tempo para si.",
+                    canais=["instagram", "whatsapp"], data_inicio=d + timedelta(days=5), data_fim=d + timedelta(days=30),
+                    responsavel_id=maira.id, criado_por_id=maira.id, is_demo=True)
+    db.add(camp)
+    db.flush()
+    itens = [
+        (-6, "instagram", "educativo", "carrossel", "Como hidratar cabelos 4C/4D no calor", "publicado",
+         "Cabelos 4C e 4D pedem hidratação com calma e camadas. Guarda este passo a passo para o teu próximo dia de cuidado. 🌿",
+         "#Lumara #Cabelos4C #CuidadoNatural #Luanda", "Guarda para não esquecer"),
+        (-2, "instagram", "bastidores", "reel", "Um dia na produção dos sabonetes artesanais", "aprovado",
+         "Do corte ao embrulho: cada sabonete passa pelas nossas mãos. Vem ver como nasce o teu ritual.", "#Lumara #FeitoAMao #Angola", "Envia-nos mensagem para encomendar"),
+        (1, "instagram", "produto", "post", "Óleo fortalecedor de unhas — ritual de 2 minutos", "revisao",
+         "Um momento só teu: 2 minutos para cuidar das unhas antes de dormir. [preço] · encomendas por mensagem.", "#Lumara #Unhas #Autocuidado", "Encomenda por mensagem"),
+        (3, "facebook", "testemunhos", "post", "Testemunho de cliente sobre o óleo corporal", "criacao",
+         "[testemunho real da cliente, com autorização] — [nome da cliente]", None, None),
+        (6, "whatsapp", "promocoes", "story", "Anúncio dos kits de festas", "planeamento", None, None, None),
+        (9, "instagram", "educativo", "reel", "Mãos e pés: rotina de cuidado semanal", "ideia", None, None, None),
+    ]
+    for dias, plat, cat, fmt, tema, estado, texto, tags, cta in itens:
+        c = Conteudo(data_publicacao=d + timedelta(days=dias), plataforma=plat, categoria=cat, formato=fmt, tema=f"[DEMO] {tema}",
+                     texto=texto, hashtags=tags, cta=cta, estado=estado, responsavel_id=maira.id, criado_por_id=maira.id, is_demo=True,
+                     campanha_id=camp.id if cat == "promocoes" else None)
+        if estado in ("aprovado", "publicado"):
+            c.aprovado_em, c.aprovado_por_id, c.submetido_em = agora(), luisa.id, agora()
+        if estado == "revisao":
+            c.submetido_em = agora()
+        if estado == "publicado":
+            c.publicado_em = agora()
+        db.add(c)
     db.flush()
 
 

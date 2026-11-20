@@ -16,8 +16,9 @@ notificações, registo de actividade, configuração), nunca por cópia de dado
 │  ├─ core: configuração, sessões, RBAC, erros, auditoria, fuso Africa/Luanda                   │
 │  ├─ Fase 1: auth · equipa · tarefas · notificações · ocorrências · responsabilidades · rotina  │
 │  │          dashboard/excepções · auditoria · configuração · Fase 2: stock · produção     │
+│  │          Fase 3: marketing · campanhas · IA (adaptador) · integrações (declaradas)            │
 │  ├─ automação: verificação idempotente de alertas (pedido, botão da CEO ou cron)              │
-│  └─ (futuro) marketing · vendas · finanças · eventos · procedimentos · IA                    │
+│  └─ (futuro) vendas · eventos · finanças · procedimentos · automação avançada                │
 └──────────────────────────────────────────┬─────────────────────────────────────────────────────┘
                                            │ SQLAlchemy 2 · migrações Alembic
 ┌──────────────────────────────────────────▼─────────────────────────────────────────────────────┐
@@ -37,7 +38,7 @@ notificações, registo de actividade, configuração), nunca por cópia de dado
 | Backend | FastAPI (Python) | API estruturada com validação automática (Pydantic), documentação OpenAPI gerada em `/docs`, e a mesma linguagem que facilita a integração futura de IA e análise de dados. É também a stack já usada neste repositório (Agenda Mestre) e já publicada no Render. |
 | Base de dados | PostgreSQL | Relacional, transacções, restrições (CHECK, UNIQUE, FK), JSONB, triggers. Portável: corre em Render, Supabase, Neon, RDS ou num servidor próprio. |
 | Autenticação | Própria, sessões opacas | Ver abaixo. |
-| IA (Fase 3+) | Adaptador por fornecedor | Interface única `AssistenteIA` com implementações por fornecedor; chaves só no servidor. |
+| IA (Fase 3) | Claude (Anthropic), SDK oficial | Interface `FornecedorIA` com adaptador Anthropic (saída JSON estruturada, cache do guia de marca, reencaminhamento automático em recusas); outro fornecedor = novo adaptador. Chave só no servidor. |
 
 **Supabase?** Foi considerado. Dá Postgres gerido + autenticação, mas acopla autenticação e regras de acesso (RLS) ao
 fornecedor e espalha a lógica de negócio entre SQL e frontend. Como as regras da Lumara (aprovações, escalonamento
@@ -126,4 +127,4 @@ flowchart LR
 ```
 
 Legenda: setas contínuas = fluxo de dados implementado ou planeado com regra de negócio; tracejado = referência/sugestão.
-Activo: Fase 1 (Núcleo, Tarefas, Dashboard, Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal) e Fase 2 (Produção, Stock e Inventário).
+Activo: Fase 1 (Núcleo, Tarefas, Dashboard, Central de Excepções, Ocorrências, Responsabilidades, Rotina semanal) Fase 2 (Produção, Stock e Inventário) e Fase 3 (Marketing, Campanhas, Assistente de IA).

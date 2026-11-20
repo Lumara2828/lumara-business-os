@@ -35,9 +35,13 @@ Fonte de verdade: `backend/app/core/permissions.py` (testada em `tests/test_perm
 | Atribuir ordens a outra pessoa | ● | | |
 | Registar e resolver não conformidades | ● | | ● |
 | **Custos unitários, custo de produção, valor do inventário** | ● | ✖ | ✖ |
+| **Fase 3 — Marketing** | | | |
+| Calendário editorial, campanhas (propor), importação Excel, métricas | ● | ● | |
+| Assistente de IA (sugestões) | ● | ● | |
+| Aprovar conteúdos e campanhas | ● | | |
+| Editar o guia de marca e as expressões proibidas | ● | | |
+| Orçamento das campanhas | ● | ✖ | ✖ |
 | **Fases seguintes (já declaradas)** | | | |
-| Calendário editorial | ● | ● | |
-| Aprovar publicação de conteúdos | ● | | |
 | Vendas e clientes (CRM) | ● | ● | |
 | **Dados financeiros confidenciais** | ● | ✖ | ✖ |
 | Aprovar despesas, alterar preços | ● | ✖ | ✖ |

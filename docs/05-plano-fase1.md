@@ -59,6 +59,27 @@ Suposições da Fase 2 (configuráveis ou documentadas):
 - Ficha técnica já usada não se edita: gera nova versão (a anterior fica inactiva).
 - Dados DEMO de stock não têm custos (não se inventam valores financeiros).
 
+## Fase 3 — Marketing inteligente (implementada)
+
+| # | Entrega | Estado |
+|---|---|---|
+| 1 | Calendário editorial (data, hora, plataforma, categoria, formato, tema, objectivo, texto, hashtags, CTA, guião, responsável, campanha) com vista mensal e fluxo em 8 estados | ✅ |
+| 2 | Aprovação humana obrigatória (só a CEO aprova; sem aprovação não se agenda nem publica — também imposto por CHECK na BD); alterar o texto após aprovação anula-a | ✅ |
+| 3 | Importação do calendário existente em Excel (.xlsx): detecção do cabeçalho e das colunas, sinónimos, pré-visualização com erros, lote identificado; nunca importa como aprovado | ✅ |
+| 4 | Assistente de IA (Claude): legendas, hashtags, CTA, temas, guiões de Reels, Stories, campanhas, adaptação a plataformas — com guia de marca, saída estruturada, registo de cada pedido e limite por hora | ✅ |
+| 5 | Verificação de alegações (expressões proibidas configuráveis) em qualquer texto, manual ou da IA | ✅ |
+| 6 | Imagens e vídeos anexados a cada conteúdo, comentários e histórico | ✅ |
+| 7 | Campanhas (proposta → aprovação da CEO → activa → concluída), orçamento visível só à CEO | ✅ |
+| 8 | Análise de desempenho: métricas por publicação (registo manual), envolvimento, por categoria/plataforma, melhores conteúdos | ✅ |
+| 9 | Adaptadores de integração (Instagram, Facebook, WhatsApp Business, Canva, Metricool, Make) declarados, com credenciais necessárias — nenhum simulado | ✅ |
+| 10 | Dashboard, Central de Excepções e alertas com marketing | ✅ |
+| 11 | Testes: +9 de integração (50 no total) e fluxo ponta-a-ponta (importação → submissão → aprovação) | ✅ |
+
+Suposições da Fase 3:
+- Uma linha do calendário = uma publicação numa plataforma (para várias plataformas: «Adaptar» com a IA e criar uma entrada por plataforma).
+- Estados do Excel além de «revisão» (aprovado, publicado…) entram como **revisão**: a aprovação é sempre feita no sistema.
+- Métricas são registadas à mão até às integrações da Fase 6.
+- Eventos e feiras (com produtos a levar, checklist e rentabilidade) passam para a Fase 4, porque a rentabilidade depende das vendas.
+
 ## Próximas fases (resumo)
-- **Fase 3** Marketing: calendário editorial (importação CSV/Excel do calendário existente), fluxo IDEIA→ANÁLISE, assistente de IA com regras de marca e sem alegações médicas, aprovação humana obrigatória, adaptadores de integração sem simulação.
-- **Fase 4** Vendas e CRM; **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.
+- **Fase 4** Vendas e CRM, eventos e feiras; **Fase 5** Finanças e BI; **Fase 6** integrações e automação avançada.

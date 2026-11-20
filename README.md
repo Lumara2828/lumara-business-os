@@ -1,7 +1,8 @@
 # Lumara Business OS
 
 Plataforma integrada de gestão da **Lumara Cosméticos Artesanais** (Angola). Estado: **Fase 1 — Autonomia
-operacional** e **Fase 2 — Produção e Stock** implementadas e testadas.
+operacional** **Fase 2 — Produção e Stock** e **Fase 3 — Marketing com IA**
+implementadas e testadas.
 
 - `backend/` — API FastAPI + PostgreSQL (SQLAlchemy 2, Alembic)
 - `frontend/` — React 19 + TypeScript + Tailwind CSS 4 + Recharts
@@ -52,11 +53,25 @@ Depois, na app, a CEO cria as contas da Maira e da Diana em **Equipa** (palavra-
 
 ## Testes
 ```bash
-cd backend && createdb lumara_test && pytest -q          # 41 testes de integração (BD real, recriada a cada execução)
+cd backend && createdb lumara_test && pytest -q          # 50 testes de integração (BD real, recriada a cada execução)
 cd frontend && npm test && npm run build                 # testes unitários + verificação de tipos + build
 # Ponta-a-ponta (API com dados DEMO em :8000 e Vite em :5173; usa o Playwright instalado globalmente):
 NODE_PATH=$(npm root -g) node e2e/fluxo.mjs e2e/capturas
 ```
+
+## Inteligência artificial (assistente de marketing)
+
+Fornecedor recomendado: **Claude (Anthropic)**, através do SDK oficial e de um adaptador
+(`backend/app/modules/ia/fornecedores.py`) preparado para outros fornecedores.
+
+1. Criar uma conta e uma chave em console.anthropic.com (com limite de gasto mensal definido na consola).
+2. No servidor (nunca no frontend), definir `ANTHROPIC_API_KEY=...` e, opcionalmente, `IA_MODELO`
+   (`claude-opus-5-5` por omissão; `claude-sonnet-5-5` ou `claude-haiku-5-5` são mais económicos).
+3. Reiniciar a API. Em **Marketing → Integrações** o assistente aparece como «Activa».
+
+Sem chave, o assistente responde «não configurado» — nunca simula sugestões. A IA só sugere:
+não grava, não aprova e não publica. Cada pedido fica registado (utilizadora, modelo, tokens) e há
+um limite por utilizadora (`IA_LIMITE_PEDIDOS_HORA`).
 
 ## Operação
 - **Alertas** (atrasos, prazos de amanhã, aprovações paradas, stock mínimo, rupturas, validades): corridos automaticamente ao abrir notificações (no

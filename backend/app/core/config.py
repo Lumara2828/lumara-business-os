@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # erros internos nunca são devolvidos ao cliente.
     ambiente: str = "desenvolvimento"
 
+    # Inteligência artificial (Fase 3). Sem chave, o assistente responde "não configurado"
+    # — nunca simula respostas. A chave só existe no servidor.
+    ia_fornecedor: str = "anthropic"            # "anthropic" | "nenhum"
+    anthropic_api_key: str | None = None
+    ia_modelo: str = "claude-opus-5-5"          # alternativas mais económicas: claude-sonnet-5-5, claude-haiku-5-5
+    ia_esforco: str = "medium"                  # low | medium | high
+    ia_limite_pedidos_hora: int = 30            # por utilizadora, para controlo de custos
+
     @property
     def lista_cors(self) -> list[str]:
         return [o.strip() for o in self.cors_origens.split(",") if o.strip()]

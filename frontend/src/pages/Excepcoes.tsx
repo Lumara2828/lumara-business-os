@@ -13,7 +13,9 @@ interface Dados { total: number; dias_atraso_alerta_ceo: number; data: string; s
   encomendas_problematicas: OccItem[]; outras_ocorrencias: OccItem[];
   desvios_metas: { indicador: string; meta: number; actual: number; mensagem: string }[];
   stock_critico: { id: string; nome: string; unidade: string; disponivel: string; stock_minimo: string; ruptura: boolean }[];
-  lotes_expirados: { id: string; numero: string; artigo: string; validade: string; saldo: string; unidade: string }[] } }
+  lotes_expirados: { id: string; numero: string; artigo: string; validade: string; saldo: string; unidade: string }[];
+  conteudos_aprovacao: { id: string; codigo: string; tema: string; plataforma: string; data_publicacao: string; responsavel: string }[];
+  campanhas_aprovacao: { id: string; nome: string; data_inicio: string; data_fim: string; responsavel: string }[] } }
 
 export default function Excepcoes() {
   const toast = useToast();
@@ -37,6 +39,15 @@ export default function Excepcoes() {
       {d.total === 0 && <div className="cartao"><Vazio titulo="Sem excepções" texto="A operação está a decorrer sem precisar de si. 🌿" /></div>}
       <div className="grid lg:grid-cols-2 gap-4">
         <BlocoTarefas titulo="Trabalhos a aguardar aprovação" tarefas={s.aprovacoes} />
+        <Bloco titulo="Conteúdos a aprovar (marketing)" n={s.conteudos_aprovacao.length + s.campanhas_aprovacao.length}>
+          {s.conteudos_aprovacao.length + s.campanhas_aprovacao.length === 0 ? <p className="text-sm text-terra-700">Nada pendente.</p> : (
+            <ul className="divide-y divide-linho/60 text-sm">
+              {s.conteudos_aprovacao.map((c) => <li key={c.id}><Link to="/marketing" className="block py-2 hover:underline">{c.codigo} · {c.tema.replace(/^\[DEMO\] /, "")}
+                <span className="block text-xs text-terra-700">{c.responsavel} · {c.plataforma} · publicar a {fData(c.data_publicacao)}</span></Link></li>)}
+              {s.campanhas_aprovacao.map((k) => <li key={k.id}><Link to="/marketing" className="block py-2 hover:underline">Campanha: {k.nome.replace(/^\[DEMO\] /, "")}
+                <span className="block text-xs text-terra-700">{k.responsavel} · {fData(k.data_inicio)} a {fData(k.data_fim)}</span></Link></li>)}
+            </ul>)}
+        </Bloco>
         <BlocoTarefas titulo="Tarefas bloqueadas" tarefas={s.bloqueadas} motivo />
         <BlocoTarefas titulo={`Atrasos relevantes (≥ ${d.dias_atraso_alerta_ceo} dias ou críticos)`} tarefas={s.atrasos} />
         <BlocoTarefas titulo="Tarefas críticas em curso" tarefas={s.criticas} />

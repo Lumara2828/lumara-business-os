@@ -5,7 +5,7 @@ finanças, stock) o resumo diz isso explicitamente, em vez de inventar.
 """
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tempo import formatar_data, hoje, inicio_semana, periodo
@@ -85,6 +85,13 @@ def resumo_executivo(db: Session) -> dict:
     for t in atrasadas:
         if dias_atraso(t) >= dias_ceo and t.estado not in ("bloqueada", "aguardar_aprovacao"):
             intervencao.append(f"{codigo(t)} com {dias_atraso(t)} dia(s) de atraso ({t.responsavel.nome}).")
+    from app.modules.marketing.models import Campanha, Conteudo
+    n_conteudos = db.scalar(select(func.count()).where(Conteudo.estado == "revisao")) or 0
+    if n_conteudos:
+        intervencao.append(f"{n_conteudos} conteúdo(s) de marketing a aguardar a sua aprovação.")
+    n_camp = db.scalar(select(func.count()).where(Campanha.estado == "proposta")) or 0
+    if n_camp:
+        intervencao.append(f"{n_camp} campanha(s) proposta(s) a aguardar decisão.")
     from app.modules.stock import service as stock
     for a, q in stock.abaixo_minimo(db):
         if q <= 0:

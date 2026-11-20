@@ -150,6 +150,46 @@ await maira.goto(`${BASE}/stock`);
 await maira.waitForSelector("text=Stock e inventário");
 assert.equal(await maira.locator("button:has-text('+ Entrada')").count(), 0, "Maira só consulta o stock");
 
+// --- Fase 3: marketing ---
+const XLSX = process.env.E2E_XLSX;
+await maira.goto(`${BASE}/marketing`);
+await maira.waitForSelector("text=Marketing e conteúdos");
+await maira.click("role=tab[name='Importar Excel']");
+await maira.setInputFiles("input[type=file][accept='.xlsx,.xlsm']", XLSX);
+await maira.waitForSelector("text=Pré-visualização");
+await foto(maira, "18-importar-excel");
+await maira.click("button:has-text('Importar linhas válidas')");
+await maira.waitForSelector("text=Importação concluída");
+assert.ok(await maira.locator("text=2 conteúdo(s) criado(s)").count() === 1, "Importa as 2 linhas válidas");
+await maira.click("button:has-text('Ver no calendário')");
+await maira.click("role=tab[name='Fluxo de trabalho']");
+await maira.click("text=E2E: ingredientes naturais explicados");
+await maira.waitForSelector("role=dialog");
+await maira.fill("#ct-texto", "Conhece os ingredientes que usamos e porquê. Guarda este post. 🌿");
+await maira.click("role=dialog >> button:has-text('Guardar')");
+await maira.waitForSelector("text=Guardado.");
+await maira.click("role=dialog >> role=tab[name='Assistente IA']");
+await maira.waitForSelector("text=Assistente de IA não configurado");
+await maira.click("role=dialog >> role=tab[name='Conteúdo']");
+await maira.click("role=dialog >> button:has-text('Submeter para aprovação')");
+await maira.waitForSelector("role=dialog >> text=Revisão");
+await maira.keyboard.press("Escape");
+
+await luisa.goto(`${BASE}/marketing`);
+await luisa.waitForSelector("text=a aguardar a sua aprovação");
+await luisa.click("role=tab[name='Fluxo de trabalho']");
+await foto(luisa, "19-marketing-fluxo");
+await luisa.click("text=E2E: ingredientes naturais explicados");
+luisa.once("dialog", (d) => d.accept("Muito bom"));
+await luisa.click("role=dialog >> button:has-text('Aprovar publicação')");
+await luisa.waitForSelector("role=dialog >> text=Aprovado");
+await luisa.keyboard.press("Escape");
+await luisa.click("role=tab[name='Calendário']");
+await foto(luisa, "20-marketing-calendario");
+await luisa.click("role=tab[name='Integrações']");
+await luisa.waitForSelector("text=Nenhuma integração é simulada");
+assert.equal(await diana.locator("nav >> text=Marketing").count(), 0, "Diana não vê o marketing");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

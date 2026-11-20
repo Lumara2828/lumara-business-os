@@ -60,6 +60,7 @@ def verificar(db: Session) -> dict:
     db.flush()
     criados.update(verificar_stock(db, commit=False))
     criados.update(verificar_validades(db))
+    criados.update(verificar_conteudos(db))
 
     linha = db.get(Configuracao, "_ultima_verificacao_alertas")
     marca = {"valor": agora().isoformat()}
@@ -125,3 +126,21 @@ def verificar_validades(db: Session) -> dict:
             notificar_ceo(db, "validade", titulo, msg, "/stock", chave_dedup=f"exp:{lote.id}:{d.isoformat()}")
             n_exp += 1
     return {"validade_proxima": n_prox, "lotes_expirados": n_exp}
+
+
+def verificar_conteudos(db: Session) -> dict:
+    """Conteúdos com data de hoje ainda sem aprovação, e conteúdos com data passada não publicados:
+    avisam a responsável (a CEO vê-os na Central de Excepções se estiverem em revisão)."""
+    from app.modules.marketing.models import Conteudo
+    d = hoje()
+    n = 0
+    for c in db.scalars(select(Conteudo).where(Conteudo.data_publicacao <= d,
+                                               Conteudo.estado.in_(("ideia", "planeamento", "criacao", "revisao", "aprovado", "agendado")))).unique():
+        if c.data_publicacao == d and c.estado in ("aprovado", "agendado"):
+            continue
+        titulo = (f"Publicação de hoje sem aprovação: {c.tema}" if c.data_publicacao == d
+                  else f"Publicação em atraso: {c.tema}")
+        notificar(db, c.responsavel_id, "conteudo_atraso", titulo, f"C-{c.numero:04d} ({c.plataforma}) — data {formatar_data(c.data_publicacao)}.",
+                  "/marketing", chave_dedup=f"cont:{c.id}:{d.isoformat()}")
+        n += 1
+    return {"conteudos_atraso": n}

@@ -45,9 +45,10 @@ class P(StrEnum):
     STOCK_VER = "stock.ver"                      # consultar quantidades (sem valores)
     STOCK_MOVIMENTAR = "stock.movimentar"
     STOCK_VER_VALOR = "stock.ver_valor"          # custos e valor do inventário (confidencial)
+    # --- Fase 3: marketing e IA ---
+    MARKETING_CALENDARIO = "marketing.calendario"      # calendário, campanhas, assistente de IA
+    MARKETING_APROVAR = "marketing.aprovar_publicacao"  # aprovação humana obrigatória antes de agendar/publicar
     # --- Fases seguintes (declaradas, sem endpoints ainda) ---
-    MARKETING_CALENDARIO = "marketing.calendario"
-    MARKETING_APROVAR = "marketing.aprovar_publicacao"
     VENDAS_GERIR = "vendas.gerir"
     FINANCAS_VER = "financas.ver"
     FINANCAS_APROVAR_DESPESAS = "financas.aprovar_despesas"

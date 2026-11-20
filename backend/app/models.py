@@ -10,3 +10,4 @@ from app.modules.rotina.models import RelatorioSemanal  # noqa: F401
 from app.modules.tarefas.models import AnexoTarefa, CategoriaTarefa, ComentarioTarefa, Tarefa  # noqa: F401
 from app.modules.producao.models import FichaIngrediente, FichaTecnica, NaoConformidade, OrdemProducao  # noqa: F401,E402
 from app.modules.stock.models import Artigo, Fornecedor, Lote, Movimento  # noqa: F401,E402
+from app.modules.marketing.models import Campanha, ComentarioConteudo, Conteudo, InteracaoIA, MediaConteudo  # noqa: F401,E402
