@@ -1,0 +1,244 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { api } from "../api/client";
+import type { EstadoActual, Indicadores, ResumoExecutivo, Tarefa } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
+import { Carregando, ErroCaixa, EstadoBadge, Kpi, PrioridadeBadge, Seccao, Vazio } from "../components/ui";
+import { fData, fDataHora, MESES, ROTULO_FUNCAO } from "../lib/formato";
+import { useDados } from "../lib/useDados";
+
+// Paleta validada (CVD/contraste) para as duas séries; o âmbar tem contraste < 3:1,
+// por isso o gráfico tem legenda, tooltip e vista em tabela.
+const COR_CONCLUIDAS = "#4f7a3a";
+const COR_CRIADAS = "#d9a05b";
+
+export default function Painel() {
+  const { pode } = useAuth();
+  return pode("dashboard.executivo") ? <PainelExecutivo /> : <PainelPessoal />;
+}
+
+interface Executivo {
+  periodo: { tipo: string; inicio: string; fim: string; anterior_inicio: string; anterior_fim: string };
+  estado_actual: EstadoActual;
+  indicadores: { actual: Indicadores; anterior: Indicadores; meta_cumprimento: number };
+  por_pessoa: { utilizador: { id: string; nome: string; funcao: string }; actual: EstadoActual; periodo: Indicadores }[];
+  serie_semanal: { semana_inicio: string; concluidas: number; criadas: number }[];
+  ocorrencias_abertas: Record<string, number>;
+  proximos_prazos: Tarefa[];
+  resumo: ResumoExecutivo;
+  modulos: { modulo: string; fase: number; estado: string }[];
+  gerado_em: string;
+}
+
+function rotuloPeriodo(tipo: string, inicio: string) {
+  const [a, m] = inicio.split("-").map(Number);
+  if (tipo === "mes") return `${MESES[m - 1]} ${a}`;
+  if (tipo === "trimestre") return `${Math.floor((m - 1) / 3) + 1}.º trimestre ${a}`;
+  return String(a);
+}
+
+function Variacao({ actual, anterior, sufixo = "" }: { actual: number | null; anterior: number | null; sufixo?: string }) {
+  if (actual === null || anterior === null) return <span>Período anterior: {anterior ?? "—"}{anterior !== null ? sufixo : ""}</span>;
+  const d = Math.round((actual - anterior) * 10) / 10;
+  return <span>Período anterior: {anterior}{sufixo} <b className={d >= 0 ? "text-folha-600" : "text-alerta"}>({d >= 0 ? "+" : ""}{d}{sufixo})</b></span>;
+}
+
+function PainelExecutivo() {
+  const navegar = useNavigate();
+  const [tipo, setTipo] = useState<"mes" | "trimestre" | "ano">("mes");
+  const [referencia, setReferencia] = useState("");
+  const [tabela, setTabela] = useState(false);
+  const { dados: d, erro, recarregar } = useDados(
+    () => api.get<Executivo>("/dashboard/executivo", { tipo_periodo: tipo, referencia: referencia || undefined }), [tipo, referencia]);
+
+  if (erro) return <ErroCaixa texto={erro} aoTentar={recarregar} />;
+  if (!d) return <Carregando />;
+  const { actual, anterior, meta_cumprimento: meta } = d.indicadores;
+  const ea = d.estado_actual;
+  const r = d.resumo;
+  const corNivel = { bom: "bg-folha-600", atencao: "bg-aviso", critico: "bg-alerta", neutro: "bg-terra-300" }[r.nivel];
+  const serie = d.serie_semanal.map((s) => ({ ...s, semana: fData(s.semana_inicio).slice(0, 5) }));
+  const totalOcc = Object.values(d.ocorrencias_abertas).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="titulo-pagina">Painel executivo</h1>
+          <p className="text-sm text-terra-700">{rotuloPeriodo(d.periodo.tipo, d.periodo.inicio)} · {fData(d.periodo.inicio)} a {fData(d.periodo.fim)} · actualizado {fDataHora(d.gerado_em)}</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <select className="campo !w-auto" aria-label="Período" value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)}>
+            <option value="mes">Mês</option><option value="trimestre">Trimestre</option><option value="ano">Ano</option>
+          </select>
+          <input type="date" className="campo !w-auto" aria-label="Data de referência" value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+        </div>
+      </div>
+
+      <section className="cartao overflow-hidden">
+        <div className={`${corNivel} h-1.5`} />
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-terra-500">1. Como está a Lumara?</p>
+            <p className="font-serif text-xl mt-1">{r.como_esta}</p>
+          </div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 text-sm">
+            <Bloco t="2. O que está a correr bem?" itens={r.corre_bem} />
+            <Bloco t="3. O que está atrasado?" itens={r.atrasado} />
+            <Bloco t="5. O que precisa da sua intervenção?" itens={r.intervencao_ceo} destaque />
+            <div>
+              <p className="text-xs uppercase tracking-wide text-terra-500 mb-1">4. Onde estamos a perder dinheiro?</p>
+              <p className="text-terra-700 text-xs">{r.perdas.nota}</p>
+              {r.perdas.itens.length > 0 && <ul className="mt-1 list-disc pl-5">{r.perdas.itens.map((x) => <li key={x}>{x}</li>)}</ul>}
+            </div>
+            <Bloco t="6. Três prioridades da próxima semana" itens={r.prioridades} ordenada />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi titulo="Cumprimento de prazos" valor={actual.taxa_cumprimento === null ? "—" : `${actual.taxa_cumprimento}%`}
+          tom={actual.taxa_cumprimento === null ? "neutro" : actual.taxa_cumprimento >= meta ? "bom" : "alerta"}
+          detalhe={<><span>Meta: {meta}%</span><br /><Variacao actual={actual.taxa_cumprimento} anterior={anterior.taxa_cumprimento} sufixo="%" /></>} />
+        <Kpi titulo="Concluídas no período" valor={actual.concluidas_no_periodo}
+          detalhe={<Variacao actual={actual.concluidas_no_periodo} anterior={anterior.concluidas_no_periodo} />} />
+        <Kpi titulo="Tarefas em atraso" valor={ea.em_atraso} tom={ea.em_atraso ? "alerta" : "bom"}
+          detalhe={`${ea.pendentes} pendentes no total`} aoClicar={() => navegar("/tarefas")} />
+        <Kpi titulo="Exigem decisão" valor={ea.aguardar_aprovacao + ea.bloqueadas} tom={ea.aguardar_aprovacao + ea.bloqueadas ? "aviso" : "bom"}
+          detalhe={`${ea.aguardar_aprovacao} aprovação · ${ea.bloqueadas} bloqueada(s) · ${totalOcc} ocorrência(s)`} aoClicar={() => navegar("/excepcoes")} />
+      </div>
+
+      <div className="grid lg:grid-cols-5 gap-4">
+        <Seccao className="lg:col-span-3" titulo="Execução semanal (últimas 8 semanas)"
+          accao={<button className="btn-fantasma text-xs" onClick={() => setTabela(!tabela)}>{tabela ? "Ver gráfico" : "Ver tabela"}</button>}>
+          {tabela ? (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-terra-700"><tr><th className="text-left py-1">Semana de</th><th className="text-right">Criadas</th><th className="text-right">Concluídas</th></tr></thead>
+              <tbody className="divide-y divide-linho/60">{d.serie_semanal.map((s) => (
+                <tr key={s.semana_inicio}><td className="py-1">{fData(s.semana_inicio)}</td><td className="text-right">{s.criadas}</td><td className="text-right">{s.concluidas}</td></tr>))}</tbody>
+            </table>
+          ) : (
+            <div className="h-64" role="img" aria-label="Gráfico de tarefas criadas e concluídas por semana">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={serie} barGap={2} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#ede4d6" />
+                  <XAxis dataKey="semana" tickLine={false} axisLine={{ stroke: "#e2d6c3" }} tick={{ fill: "#6b4f3a", fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#6b4f3a", fontSize: 11 }} />
+                  <Tooltip cursor={{ fill: "#f6f1e9" }} labelFormatter={(l) => `Semana de ${l}`}
+                    contentStyle={{ borderRadius: 12, border: "1px solid #e2d6c3", fontSize: 12, color: "#3d2e22" }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: "#3d2e22" }} />
+                  <Bar dataKey="criadas" name="Criadas" fill={COR_CRIADAS} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                  <Bar dataKey="concluidas" name="Concluídas" fill={COR_CONCLUIDAS} radius={[4, 4, 0, 0]} maxBarSize={18} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Seccao>
+        <Seccao className="lg:col-span-2" titulo="Equipa">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-terra-700"><tr><th className="text-left pb-2">Pessoa</th><th className="text-right">Pendentes</th><th className="text-right">Atraso</th><th className="text-right">No prazo</th></tr></thead>
+            <tbody className="divide-y divide-linho/60">
+              {d.por_pessoa.map((p) => (
+                <tr key={p.utilizador.id}>
+                  <td className="py-2"><Link to={`/tarefas`} className="font-medium hover:underline">{p.utilizador.nome}</Link><br /><span className="text-xs text-terra-700">{ROTULO_FUNCAO[p.utilizador.funcao]}</span></td>
+                  <td className="text-right">{p.actual.pendentes}</td>
+                  <td className={`text-right ${p.actual.em_atraso ? "text-alerta font-medium" : ""}`}>{p.actual.em_atraso}</td>
+                  <td className="text-right">{p.periodo.taxa_cumprimento === null ? "—" : `${p.periodo.taxa_cumprimento}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Seccao>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Seccao titulo="Próximos prazos (7 dias)" accao={<Link to="/tarefas" className="text-sm text-folha-700 hover:underline">Ver tarefas</Link>}>
+          <ListaTarefas tarefas={d.proximos_prazos} vazio="Sem prazos nos próximos 7 dias." />
+        </Seccao>
+        <Seccao titulo="Módulos do sistema">
+          <p className="text-xs text-terra-700 mb-3">Facturação, despesas, margens, encomendas, clientes, stock e marketing aparecem aqui quando os respectivos módulos forem activados — nada é simulado.</p>
+          <ul className="grid sm:grid-cols-2 gap-2 text-sm">
+            {d.modulos.map((m) => (
+              <li key={m.modulo} className="flex items-center justify-between gap-2 rounded-xl bg-white border border-linho px-3 py-2">
+                <span>{m.modulo}</span>
+                <span className={`text-[11px] rounded-full px-2 py-0.5 ${m.estado === "activo" ? "bg-folha-100 text-folha-700" : "bg-areia text-terra-700"}`}>
+                  {m.estado === "activo" ? "Activo" : `Fase ${m.fase}`}</span>
+              </li>
+            ))}
+          </ul>
+        </Seccao>
+      </div>
+    </div>
+  );
+}
+
+function Bloco({ t, itens, destaque, ordenada }: { t: string; itens: string[]; destaque?: boolean; ordenada?: boolean }) {
+  const Lista = ordenada ? "ol" : "ul";
+  return (
+    <div className={destaque ? "rounded-xl bg-amber-50/70 border border-aviso/20 p-3" : ""}>
+      <p className="text-xs uppercase tracking-wide text-terra-500 mb-1">{t}</p>
+      <Lista className={`${ordenada ? "list-decimal" : "list-disc"} pl-5 space-y-1`}>{itens.map((x, i) => <li key={i}>{x}</li>)}</Lista>
+    </div>
+  );
+}
+
+function ListaTarefas({ tarefas, vazio }: { tarefas: Tarefa[]; vazio: string }) {
+  if (!tarefas.length) return <p className="text-sm text-terra-700">{vazio}</p>;
+  return (
+    <ul className="divide-y divide-linho/60">
+      {tarefas.map((t) => (
+        <li key={t.id}>
+          <Link to={`/tarefas?abrir=${t.id}`} className="flex items-center gap-3 py-2 hover:bg-areia/40 rounded-lg px-1">
+            <span className={`w-20 text-xs ${t.em_atraso ? "text-alerta font-medium" : "text-terra-700"}`}>{fData(t.prazo)}</span>
+            <span className="flex-1 min-w-0 text-sm"><span className="block truncate">{t.titulo}</span><span className="text-xs text-terra-700">{t.responsavel.nome}</span></span>
+            <PrioridadeBadge prioridade={t.prioridade} /><span className="hidden sm:inline"><EstadoBadge estado={t.estado} /></span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+interface Pessoal {
+  estado_actual: EstadoActual; mes: Indicadores; meta_cumprimento: number;
+  em_atraso: Tarefa[]; hoje: Tarefa[]; esta_semana: Tarefa[]; bloqueadas: Tarefa[]; aguardar_aprovacao: Tarefa[];
+}
+
+function PainelPessoal() {
+  const { perfil } = useAuth();
+  const { dados: d, erro, recarregar } = useDados(() => api.get<Pessoal>("/dashboard/pessoal"));
+  if (erro) return <ErroCaixa texto={erro} aoTentar={recarregar} />;
+  if (!d) return <Carregando />;
+  const ea = d.estado_actual;
+  const nome = perfil?.nome.split(" ")[0];
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="titulo-pagina">Olá, {nome}</h1>
+        <p className="text-sm text-terra-700">O seu trabalho de hoje e desta semana.</p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi titulo="Para hoje" valor={ea.para_hoje} />
+        <Kpi titulo="Em atraso" valor={ea.em_atraso} tom={ea.em_atraso ? "alerta" : "bom"} />
+        <Kpi titulo="Próximos 7 dias" valor={ea.proximos_7_dias} />
+        <Kpi titulo="No prazo este mês" valor={d.mes.taxa_cumprimento === null ? "—" : `${d.mes.taxa_cumprimento}%`}
+          tom={d.mes.taxa_cumprimento === null ? "neutro" : d.mes.taxa_cumprimento >= d.meta_cumprimento ? "bom" : "aviso"}
+          detalhe={`Meta da equipa: ${d.meta_cumprimento}%`} />
+      </div>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Seccao titulo="Em atraso"><ListaTarefas tarefas={d.em_atraso} vazio="Nada em atraso. Excelente!" /></Seccao>
+        <Seccao titulo="Para hoje"><ListaTarefas tarefas={d.hoje} vazio="Sem prazos para hoje." /></Seccao>
+        <Seccao titulo="Esta semana"><ListaTarefas tarefas={d.esta_semana} vazio="Sem prazos nos próximos dias." /></Seccao>
+        <Seccao titulo="À espera de alguém">
+          {d.bloqueadas.length + d.aguardar_aprovacao.length === 0 ? <Vazio titulo="Nada parado" texto="Sem tarefas bloqueadas ou a aguardar aprovação." /> :
+            <ListaTarefas tarefas={[...d.bloqueadas, ...d.aguardar_aprovacao]} vazio="" />}
+        </Seccao>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <Link to="/tarefas" className="btn-primario">Ver as minhas tarefas</Link>
+        <Link to="/ocorrencias" className="btn-secundario">Comunicar uma ocorrência</Link>
+      </div>
+    </div>
+  );
+}
