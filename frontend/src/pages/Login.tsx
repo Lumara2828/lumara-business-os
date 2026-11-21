@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { Folha } from "../components/ui";
 import { mensagemErro } from "../lib/useDados";
 
 export default function Login() {
@@ -19,18 +18,18 @@ export default function Login() {
 
   return (
     <div className="min-h-full grid lg:grid-cols-2">
-      <div className="hidden lg:flex flex-col justify-between bg-folha-600 p-12 text-creme relative overflow-hidden">
-        <div className="flex items-center gap-3"><Folha className="h-8 w-8" /><span className="font-serif text-2xl">Lumara</span></div>
-        <div className="max-w-md">
-          <h1 className="font-serif text-4xl leading-tight">A empresa a funcionar por processos — não pela memória de alguém.</h1>
-          <p className="mt-4 text-folha-100">Tarefas, responsabilidades, aprovações e excepções num só lugar.</p>
+      <div className="hidden lg:flex flex-col justify-between bg-white p-12 relative overflow-hidden border-r border-linho">
+        <img src="/favicon.svg" alt="" aria-hidden className="pointer-events-none absolute -right-32 -bottom-28 w-[34rem] opacity-[0.12]" />
+        <img src="/lumara-logo.svg" alt="Lumara Cosméticos Artesanais — Para si com amor e carinho" className="relative w-80 max-w-full" />
+        <div className="relative max-w-md">
+          <h1 className="font-serif text-3xl font-semibold leading-tight text-folha-700">A empresa a funcionar por processos — não pela memória de alguém.</h1>
+          <p className="mt-4 text-terra-700">Tarefas, responsabilidades, aprovações e excepções num só lugar.</p>
         </div>
-        <p className="text-sm text-folha-100">Lumara Cosméticos Artesanais · Angola</p>
-        <Folha className="absolute -right-24 -bottom-24 h-96 w-96 text-folha-500/40" />
+        <p className="relative text-sm text-terra-700">Lumara Business OS · Angola</p>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submeter} className="w-full max-w-sm space-y-5" noValidate>
-          <div className="lg:hidden flex items-center gap-2 text-folha-600"><Folha className="h-7 w-7" /><span className="font-serif text-2xl">Lumara</span></div>
+          <img src="/lumara-logo-compacto.svg" alt="Lumara Cosméticos Artesanais" className="lg:hidden h-16 w-auto" />
           <div>
             <h2 className="titulo-pagina">Iniciar sessão</h2>
             <p className="text-sm text-terra-700 mt-1">Lumara Business OS</p>

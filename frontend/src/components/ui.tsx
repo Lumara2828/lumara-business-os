@@ -23,19 +23,11 @@ export function ErroCaixa({ texto, aoTentar }: { texto: string; aoTentar?: () =>
 export function Vazio({ titulo, texto, children }: { titulo: string; texto?: string; children?: ReactNode }) {
   return (
     <div className="text-center py-10 px-4">
-      <Folha className="mx-auto h-8 w-8 text-folha-300" />
+      <img src="/favicon.svg" alt="" aria-hidden className="mx-auto h-9 w-9 opacity-60" />
       <p className="mt-2 font-medium text-cacau">{titulo}</p>
       {texto && <p className="text-sm text-terra-700 mt-1">{texto}</p>}
       {children && <div className="mt-4">{children}</div>}
     </div>
-  );
-}
-
-export function Folha({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-      <path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z" /><path d="M5 19c3-4 6-7 10-10" />
-    </svg>
   );
 }
 

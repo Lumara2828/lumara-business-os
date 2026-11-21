@@ -4,7 +4,6 @@ import { api } from "../api/client";
 import type { Notificacao } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { relativo } from "../lib/formato";
-import { Folha } from "./ui";
 
 const ICONES: Record<string, string> = {
   painel: "M3 12l9-8 9 8M5 10v10h14V10",
@@ -75,13 +74,10 @@ export default function Layout() {
   return (
     <div className="min-h-full lg:flex">
       {menu && <div className="fixed inset-0 z-30 bg-cacau/30 lg:hidden" onClick={() => setMenu(false)} />}
-      <aside className={`fixed z-40 inset-y-0 left-0 w-72 transform bg-white/95 border-r border-linho flex flex-col transition lg:static lg:translate-x-0 ${menu ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-5 py-5 flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-folha-600 text-creme"><Folha className="h-6 w-6" /></span>
-          <div>
-            <p className="font-serif text-xl leading-none">Lumara</p>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-terra-500">Business OS</p>
-          </div>
+      <aside className={`print:hidden fixed z-40 inset-y-0 left-0 w-72 transform bg-white/95 border-r border-linho flex flex-col transition lg:static lg:translate-x-0 ${menu ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="px-5 pt-5 pb-4">
+          <img src="/lumara-logo-compacto.svg" alt="Lumara Cosméticos Artesanais" className="h-[4.5rem] w-auto" />
+          <p className="mt-2 text-[11px] font-serif font-semibold uppercase tracking-[0.22em] text-folha-600">Business OS</p>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 space-y-1" aria-label="Principal">
           {itens.map((x) => <NavLink key={x.a} to={x.a} end={x.a === "/"} className={ligacao}><Icone nome={x.i} />{x.n}</NavLink>)}
@@ -101,12 +97,12 @@ export default function Layout() {
         </div>
       </aside>
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-linho bg-creme/90 backdrop-blur px-4 py-3 lg:px-8">
+        <header className="print:hidden sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-linho bg-creme/90 backdrop-blur px-4 py-3 lg:px-8">
           <button className="btn-fantasma lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menu">☰</button>
           <p className="hidden sm:block text-sm text-terra-700">Lumara Cosméticos Artesanais</p>
           <Sino />
         </header>
-        <main className="flex-1 px-4 py-6 lg:px-8 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 px-4 py-6 lg:px-8 print:p-0 max-w-[1400px] w-full mx-auto">
           {perfil?.deve_mudar_password && (
             <div className="mb-4 cartao border-aviso/40 bg-amber-50 p-3 text-sm">
               Por segurança, altere a palavra-passe inicial em <NavLink to="/definicoes" className="underline font-medium">Definições</NavLink>.

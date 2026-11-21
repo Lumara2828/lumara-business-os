@@ -39,6 +39,7 @@ export default function RelatorioMensal() {
 
   return (
     <div className="space-y-5">
+      <img src="/lumara-logo-compacto.svg" alt="Lumara Cosméticos Artesanais" className="hidden print:block h-16 w-auto" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="titulo-pagina">Relatório mensal{r ? ` — ${r.periodo.nome}` : ""}</h1>

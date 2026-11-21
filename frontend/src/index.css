@@ -1,24 +1,28 @@
 @import "tailwindcss";
 
-/* Identidade Lumara: tons naturais — bege, branco, verde suave, castanho. */
+/* Identidade Lumara (caderno de aplicação do logotipo): verdes da marca sobre fundos claros.
+   folha-600 = #006633 («Cosméticos artesanais»), folha-700 = #00381C («Lumara»), folha-400 = #0CAD0C (slogan).
+   Os nomes terra/cacau mantêm-se por compatibilidade, agora em cinzentos-esverdeados neutros. */
 @theme {
-  --color-creme: #f6f1e9;
-  --color-areia: #ede4d6;
-  --color-linho: #e2d6c3;
-  --color-folha-50: #f1f4ee;
-  --color-folha-100: #dfe7d8;
-  --color-folha-300: #a3b18a;
-  --color-folha-500: #7a8b6f;
-  --color-folha-600: #5e7153;
-  --color-folha-700: #47573f;
-  --color-terra-300: #c9a98a;
-  --color-terra-500: #9c6644;
-  --color-terra-700: #6b4f3a;
-  --color-cacau: #3d2e22;
+  --color-creme: #f5f8f4;
+  --color-areia: #e9f1e8;
+  --color-linho: #d6e2d6;
+  --color-folha-50: #eef8ef;
+  --color-folha-100: #d5efd8;
+  --color-folha-300: #86d490;
+  --color-folha-400: #0cad0c;
+  --color-folha-500: #1b8a45;
+  --color-folha-600: #006633;
+  --color-folha-700: #00381c;
+  --color-terra-300: #a8b8ad;
+  --color-terra-500: #5f7466;
+  --color-terra-700: #45574b;
+  --color-cacau: #16261c;
   --color-alerta: #b5523b;
-  --color-aviso: #c08a2e;
+  --color-aviso: #b07a1e;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  /* Títulos: Montserrat (a letra de «COSMÉTICOS ARTESANAIS»), servida pelo próprio site. */
+  --font-serif: "Montserrat Variable", "Montserrat", ui-sans-serif, system-ui, sans-serif;
 }
 
 html, body, #root { height: 100%; }

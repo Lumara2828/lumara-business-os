@@ -10,7 +10,7 @@ import { useDados } from "../lib/useDados";
 
 // Paleta validada (CVD/contraste) para as duas séries; o âmbar tem contraste < 3:1,
 // por isso o gráfico tem legenda, tooltip e vista em tabela.
-const COR_CONCLUIDAS = "#4f7a3a";
+const COR_CONCLUIDAS = "#006633"; // verde da marca
 const COR_CRIADAS = "#d9a05b";
 
 export default function Painel() {

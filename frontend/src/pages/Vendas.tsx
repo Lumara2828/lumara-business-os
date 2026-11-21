@@ -386,7 +386,7 @@ function Relatorios() {
                     <Tooltip formatter={(v) => fMoeda(Number(v))} contentStyle={{ borderRadius: 12, border: "1px solid #e2d6c3", fontSize: 12 }} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="Facturação" fill="#d9a05b" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />
-                    <Bar dataKey="Recebido" fill="#4f7a3a" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />
+                    <Bar dataKey="Recebido" fill="#006633" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
