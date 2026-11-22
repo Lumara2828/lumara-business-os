@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import TarefaDetalhe from "../components/TarefaDetalhe";
+import { ProximasReunioes } from "./Agenda";
 import { Link, useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
@@ -169,6 +170,7 @@ function PainelExecutivo() {
         </Seccao>
       )}
       <TarefaDetalhe id={aberta} aoFechar={() => setAberta(null)} aoMudar={recarregar} />
+      <ProximasReunioes />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi titulo="Facturação (entregues)" valor={fMoeda(d.vendas.actual.facturacao_kz)} detalhe={<VarKz a={d.vendas.actual.facturacao_kz} b={d.vendas.anterior.facturacao_kz} />} aoClicar={() => navegar("/vendas")} />
@@ -340,6 +342,7 @@ function PainelPessoal() {
           tom={d.mes.taxa_cumprimento === null ? "neutro" : d.mes.taxa_cumprimento >= d.meta_cumprimento ? "bom" : "aviso"}
           detalhe={`Meta da equipa: ${fPct(d.meta_cumprimento)}`} />
       </div>
+      <ProximasReunioes />
       <div className="grid lg:grid-cols-2 gap-4">
         <Seccao titulo="Em atraso"><ListaTarefas tarefas={d.em_atraso} vazio="Nada em atraso. Excelente!" /></Seccao>
         <Seccao titulo="Para hoje"><ListaTarefas tarefas={d.hoje} vazio="Sem prazos para hoje." /></Seccao>

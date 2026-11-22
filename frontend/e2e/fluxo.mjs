@@ -326,6 +326,29 @@ await luisa.waitForSelector("text=Automações executadas.");
 await foto(luisa, "31-automacoes");
 assert.equal(await maira.goto(`${BASE}/relatorio`).then(() => maira.locator("text=Destaques").count()), 0, "Maira não vê o relatório mensal");
 
+// --- Melhoria nº 19: agenda de reuniões ---
+await luisa.goto(`${BASE}/agenda`);
+await luisa.click("button:has-text('+ Nova reunião')");
+await luisa.fill("#r-tit", "E2E: planeamento semanal");
+await luisa.fill("#r-local", "Atelier");
+for (const n of ["Maira", "Diana"]) await luisa.locator("role=dialog >> label", { hasText: n }).locator("input").check();
+await luisa.fill("#r-ot", "1. Encomendas da semana\n2. Produção\n3. Conteúdos");
+await luisa.click("role=dialog >> button:has-text('Marcar')");
+await luisa.waitForSelector("text=Reunião marcada.");
+await luisa.locator("li", { hasText: "E2E: planeamento semanal" }).first().click();
+await luisa.click("role=dialog >> button:has-text('Registar acta')");
+await luisa.fill("#r-acta", "Revimos as encomendas e a produção da semana.");
+await luisa.click("role=dialog >> button:has-text('+ Decisão')");
+await luisa.fill("role=dialog >> input[placeholder='Decisão']", "E2E: encomendar frascos âmbar");
+await luisa.selectOption("role=dialog >> select[aria-label='Responsável']", { label: "Diana (DEMO)" });
+await luisa.fill("role=dialog >> input[aria-label='Prazo']", new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10));
+await foto(luisa, "37-acta-reuniao");
+await luisa.click("role=dialog >> button:has-text('Guardar acta')");
+await luisa.waitForSelector("text=Acta registada.");
+await foto(luisa, "38-agenda");
+await diana.goto(`${BASE}/`);
+await diana.waitForSelector("text=Próximas reuniões").catch(() => {});
+
 // --- Melhoria nº 20: a minha função ---
 await luisa.goto(`${BASE}/a-minha-funcao`);
 await luisa.waitForSelector("text=Funções da equipa >> nth=-1");

@@ -18,3 +18,4 @@ from app.modules.procedimentos.models import ExecucaoProcedimento, Procedimento 
 from app.modules.vendas.models import Devolucao  # noqa: F401,E402
 from app.modules.ausencias.models import Ausencia, TransferenciaTarefa  # noqa: F401,E402
 from app.modules.funcoes.models import DescricaoFuncao  # noqa: F401,E402
+from app.modules.agenda.models import DecisaoReuniao, ParticipanteReuniao, Reuniao  # noqa: F401,E402

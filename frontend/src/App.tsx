@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import { Carregando } from "./components/ui";
+import Agenda from "./pages/Agenda";
 import Assistente from "./pages/Assistente";
 import Auditoria from "./pages/Auditoria";
 import Ausencias from "./pages/Ausencias";
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="auditoria" element={<Protegida permissao="auditoria.ver"><Auditoria /></Protegida>} />
         <Route path="definicoes" element={<Definicoes />} />
         <Route path="assistente" element={<Assistente />} />
+        <Route path="agenda" element={<Agenda />} />
         <Route path="a-minha-funcao" element={<MinhaFuncao />} />
         <Route path="ausencias" element={<Ausencias />} />
         <Route path="relatorio" element={<Protegida permissao="financas.ver"><RelatorioMensal /></Protegida>} />

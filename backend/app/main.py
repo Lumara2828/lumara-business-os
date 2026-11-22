@@ -18,6 +18,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.modules.assistente.router import router as assistente
+from app.modules.agenda.router import router as agenda
 from app.modules.auditoria.router import router as auditoria
 from app.modules.ausencias.router import router as ausencias
 from app.modules.funcoes.router import router as funcoes
@@ -62,7 +63,7 @@ async def cabecalhos_seguranca(request: Request, call_next):
 
 
 for r in (auth, equipa, tarefas, notificacoes, ocorrencias, responsabilidades, rotina, dashboard, auditoria, configuracao,
-          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos, assistente, relatorios, automacoes, ausencias, funcoes):
+          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos, assistente, relatorios, automacoes, ausencias, funcoes, agenda):
     app.include_router(r)
 
 

@@ -3,6 +3,18 @@
 # Requer: API em :8000 (backend/.env a apontar para a BD local) e Vite em :5173.
 set -euo pipefail
 cd "$(dirname "$0")/../../backend"
+# Remove o que as execuções anteriores do teste criaram (títulos «E2E:»), só na base local.
+.venv/bin/python - <<'PY'
+import app.models  # noqa: F401
+from sqlalchemy import text
+from app.core.database import SessionLocal
+with SessionLocal() as db:
+    for sql in ("DELETE FROM conteudos WHERE tema LIKE 'E2E:%'", "DELETE FROM reunioes WHERE titulo LIKE 'E2E:%'",
+                "DELETE FROM tarefas WHERE titulo LIKE 'E2E:%'", "DELETE FROM ocorrencias WHERE titulo LIKE 'E2E:%'",
+                "DELETE FROM lancamentos WHERE descricao LIKE 'E2E:%'"):
+        db.execute(text(sql))
+    db.commit()
+PY
 .venv/bin/python -m scripts.seed_demo --limpar >/dev/null
 .venv/bin/python -m scripts.seed_demo >/dev/null
 cd ../frontend

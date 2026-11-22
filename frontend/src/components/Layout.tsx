@@ -26,6 +26,7 @@ const ICONES: Record<string, string> = {
   assistente: "M4 5h16v11H9l-5 4zM8 9h8M8 12h5",
   relatorio: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h3",
   automacoes: "M13 3L5 13h6l-1 8 8-10h-6z",
+  agenda: "M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M8 13h3M8 16h6",
   funcao: "M12 11a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-7 8-7s8 3 8 7M16 15l2 2 4-4",
   ausencias: "M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M9 14l6 0",
 };
@@ -48,6 +49,7 @@ export default function Layout() {
   const itens = [
     { a: "/", n: "Painel", i: "painel" },
     { a: "/tarefas", n: "Tarefas", i: "tarefas" },
+    { a: "/agenda", n: "Agenda", i: "agenda" },
     { a: "/assistente", n: "Assistente", i: "assistente" },
     pode("excepcoes.ver") && { a: "/excepcoes", n: "Central de Excepções", i: "excepcoes" },
     pode("relatorios.equipa") && { a: "/rotina", n: "Rotina semanal", i: "rotina" },

@@ -180,3 +180,40 @@ def test_a_minha_funcao(equipa):
     luisa.post(f"/funcoes/{diana.id}/aprovar")
     assert diana.get("/funcoes/minha").json()["descricao"]["missao"] == "Produzir as bases com qualidade."
     assert {x["nome"]: x["estado"] for x in luisa.get("/funcoes").json()}["Diana"] == "aprovada"
+
+
+# --- nº 19: agenda de reuniões -----------------------------------------------------
+
+def test_agenda_de_reunioes(equipa, db, monkeypatch):
+    luisa, maira, diana = equipa
+    d = hoje()
+    em = lambda n: (d + timedelta(days=n)).isoformat()  # noqa: E731
+    base = {"titulo": "Planeamento semanal", "tipo": "equipa", "data": em(0), "hora": "09:00", "participantes": [maira.id, diana.id]}
+    assert maira.post("/reunioes", base).status_code == 403  # só a CEO marca reuniões de equipa
+    r = luisa.post("/reunioes", {**base, "semanal_ate": em(21), "local": "Atelier"}).json()
+    assert r["criadas"] == 4 and r["semanal"] and {p["nome"] for p in r["participantes"]} == {"Luísa", "Maira", "Diana"}
+    assert len(diana.get("/reunioes").json()) == 4 and diana.get("/reunioes/proximas").json()[0]["titulo"] == "Planeamento semanal"
+    # A Maira marca uma reunião com um fornecedor só para si; a Diana não a vê.
+    f = maira.post("/reunioes", {"titulo": "Fornecedor de frascos", "tipo": "fornecedor", "data": em(2), "hora": "15:30",
+                                 "externos": "Vidros Luanda"}).json()
+    assert all(x["id"] != f["id"] for x in diana.get("/reunioes").json())
+    assert diana.get(f"/reunioes/{f['id']}").status_code == 404
+    assert diana.put(f"/reunioes/{r['id']}", {**base, "hora": "10:00"}).status_code == 403
+    # Lembretes no dia (uma vez por pessoa)
+    from app.modules.agenda.router import lembretes
+    assert lembretes(db)["lembretes"] == 3
+    lembretes(db)
+    assert sum(1 for n in diana.get("/notificacoes").json()["itens"] if n["titulo"].startswith("Hoje às 09:00")) == 1
+    # Acta: decisões com responsável e prazo viram tarefas; sem responsável ficam só registadas.
+    assert diana.post(f"/reunioes/{r['id']}/acta", {"acta": "Revimos a semana.", "decisoes": [
+        {"texto": "Comprar frascos", "responsavel_id": maira.id, "prazo": em(3)}]}).status_code == 403
+    a = luisa.post(f"/reunioes/{r['id']}/acta", {"acta": "Revimos a semana.", "decisoes": [
+        {"texto": "Encomendar frascos âmbar", "responsavel_id": diana.id, "prazo": em(3)},
+        {"texto": "Pensar numa campanha de Natal"}]}).json()
+    assert a["estado"] == "realizada" and a["decisoes"][0]["tarefa"]["responsavel"] == "Diana" and a["decisoes"][1]["tarefa"] is None
+    assert any(t["titulo"] == "Encomendar frascos âmbar" for t in diana.get("/tarefas").json())
+    # Cancelar o resto da série
+    seguinte = sorted(diana.get("/reunioes").json(), key=lambda x: x["data"])[1]
+    c = luisa.post(f"/reunioes/{seguinte['id']}/cancelar", {"motivo": "Feira", "toda_a_serie": True}).json()
+    assert c["estado"] == "cancelada"
+    assert sum(1 for x in diana.get("/reunioes").json() if x["estado"] == "cancelada") == 3
