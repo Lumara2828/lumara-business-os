@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     ia_esforco: str = "medium"                  # low | medium | high
     ia_limite_pedidos_hora: int = 30            # por utilizadora, para controlo de custos
 
+    # Avisos por email (melhoria nº 3). Sem chave, nada é enviado — as notificações ficam só na aplicação.
+    email_fornecedor: str = "resend"            # "resend" | "nenhum"
+    email_api_key: str | None = None
+    email_remetente: str | None = None          # ex.: "Lumara Business OS <avisos@dominio-da-lumara>"
+    app_url: str | None = None                  # endereço público da aplicação, para as ligações nos emails
+
+    @property
+    def email_configurado(self) -> bool:
+        return self.email_fornecedor == "resend" and bool(self.email_api_key) and bool(self.email_remetente)
+
     @field_validator("database_url")
     @classmethod
     def _driver(cls, v: str) -> str:

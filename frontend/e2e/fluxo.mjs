@@ -433,6 +433,13 @@ await anon.close();
 await luisa.fill("#contacto_morada", "");
 await luisa.locator("li", { has: luisa.locator("#contacto_morada") }).locator("button:has-text('Guardar')").click();
 
+// --- Melhoria nº 3: avisos por email ---
+await diana.goto(`${BASE}/definicoes`);
+await diana.selectOption("#email-avisos", "urgentes_resumo");
+await diana.waitForSelector("text=Preferência guardada.");
+await diana.waitForSelector("text=O envio de emails ainda não está ligado");
+await foto(diana, "45-avisos-email");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

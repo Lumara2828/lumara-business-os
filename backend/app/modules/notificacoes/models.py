@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.core.tipos import criado_em, pk_uuid
+from app.core.tipos import criado_em, enum_texto, pk_uuid
 
 
 class Notificacao(Base):
@@ -24,3 +24,9 @@ class Notificacao(Base):
     chave_dedup: Mapped[str | None] = mapped_column(String(200), unique=True)
     lida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     criada_em: Mapped[datetime] = criado_em()
+    # Melhoria nº 3: fila de envio por email (só quando o envio está configurado e o tipo é urgente ou resumo).
+    email_estado: Mapped[str | None] = mapped_column(enum_texto("pendente", "enviado", "erro", "ignorado", nome="estado_email"))
+    email_tentativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    email_enviado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_notificacoes_email_pendente", "criada_em", postgresql_where=text("email_estado = 'pendente'")),)

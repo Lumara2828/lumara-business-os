@@ -407,3 +407,52 @@ def test_contactos_no_rodape(equipa):
     assert luisa.put("/configuracao/contacto_instagram", {"valor": ""}).status_code == 200
     assert cliente.get("/configuracao/contactos-publicos").json()["instagram"] is None
     assert luisa.put("/configuracao/meta_cumprimento_prazos", {"valor": "abc"}).status_code == 400
+
+
+def test_avisos_por_email(equipa, db, monkeypatch):
+    from sqlalchemy import select, text
+    from app.core.config import settings
+    from app.modules.equipa.models import Utilizador
+    from app.modules.notificacoes import email
+    from app.modules.notificacoes.models import Notificacao
+    from app.modules.notificacoes.service import notificar
+    luisa, maira, diana = equipa
+    # Sem chave: nada fica na fila e a automação diz que está desligada.
+    notificar(db, diana.id, "tarefa_atrasada", "Atrasada A")
+    db.commit()
+    assert db.scalar(select(Notificacao).where(Notificacao.titulo == "Atrasada A")).email_estado is None
+    assert email.processar(db) == {"desligado": True}
+    assert diana.get("/notificacoes/preferencias").json()["email_configurado"] is False
+    # Com o envio configurado (serviço simulado no teste).
+    monkeypatch.setattr(settings, "email_api_key", "chave-de-teste")
+    monkeypatch.setattr(settings, "email_remetente", "Lumara <avisos@exemplo.ao>")
+    monkeypatch.setattr(settings, "app_url", "https://app.exemplo.ao")
+    enviados = []
+    monkeypatch.setattr(email, "enviar", lambda para, assunto, texto, h: enviados.append((para, assunto, texto)))
+    db.execute(text("UPDATE utilizadores SET is_demo = false"))  # as contas de teste não são DEMO
+    db.commit()
+    assert maira.put("/notificacoes/preferencias", {"email_avisos": "nenhum"}).json()["email_avisos"] == "nenhum"
+    assert diana.put("/notificacoes/preferencias", {"email_avisos": "x"}).status_code == 400
+    notificar(db, diana.id, "tarefa_atrasada", "Atrasada B", "Há 3 dias.", "/tarefas?abrir=1")
+    notificar(db, diana.id, "comentario", "Comentário novo")  # não urgente: só na aplicação
+    notificar(db, maira.id, "tarefa_atrasada", "Atrasada C")  # Maira desligou os emails
+    notificar(db, diana.id, "resumo_semanal", "Resumo")  # Diana só quer urgentes
+    db.commit()
+    assert db.scalar(select(Notificacao).where(Notificacao.titulo == "Comentário novo")).email_estado is None
+    r = email.processar(db)
+    assert r == {"enviados": 1, "ignorados": 2, "falhados": 0}
+    para, assunto, texto = enviados[0]
+    assert para == db.get(Utilizador, diana.id).email and assunto == "[Lumara] Atrasada B"
+    assert "https://app.exemplo.ao/tarefas?abrir=1" in texto
+    assert email.processar(db)["enviados"] == 0  # não repete
+    # Falhas: tenta 3 vezes e depois desiste.
+    def falha(*a):
+        raise RuntimeError("serviço indisponível")
+    monkeypatch.setattr(email, "enviar", falha)
+    notificar(db, diana.id, "ruptura_stock", "Ruptura X")
+    db.commit()
+    for _ in range(3):
+        email.processar(db)
+    n = db.scalar(select(Notificacao).where(Notificacao.titulo == "Ruptura X"))
+    db.refresh(n)
+    assert n.email_estado == "erro" and n.email_tentativas == 3

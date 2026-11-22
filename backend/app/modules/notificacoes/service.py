@@ -21,8 +21,9 @@ def notificar(
     Com `chave_dedup`, uma segunda notificação igual é ignorada."""
     if utilizador_id is None or utilizador_id == excepto:
         return
+    from app.modules.notificacoes.email import para_email
     valores = dict(utilizador_id=utilizador_id, tipo=tipo, titulo=titulo[:200], mensagem=mensagem,
-                   ligacao=ligacao, chave_dedup=chave_dedup)
+                   ligacao=ligacao, chave_dedup=chave_dedup, email_estado="pendente" if para_email(tipo) else None)
     if chave_dedup:
         db.execute(insert(Notificacao).values(**valores).on_conflict_do_nothing(index_elements=["chave_dedup"]))
     else:

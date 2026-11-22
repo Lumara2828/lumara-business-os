@@ -24,6 +24,9 @@ class Utilizador(Base):
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     deve_mudar_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Melhoria nº 3: que avisos recebe também por email.
+    email_avisos: Mapped[str] = mapped_column(enum_texto("nenhum", "urgentes", "urgentes_resumo", nome="preferencia_email"),
+                                              nullable=False, default="urgentes", server_default="urgentes")
     ultimo_login_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tentativas_falhadas: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

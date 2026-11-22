@@ -45,6 +45,11 @@ def lembretes_reunioes(db: Session) -> dict:
     return lembretes(db)
 
 
+def emails(db: Session) -> dict:
+    from app.modules.notificacoes.email import processar
+    return processar(db)
+
+
 AUTOMACOES = {
     "alertas": {"nome": "Alertas operacionais", "descricao": "Tarefas em atraso, aprovações paradas, stock abaixo do mínimo, "
                 "validades, conteúdos sem aprovação, encomendas atrasadas e cobranças. De 15 em 15 minutos, no máximo.",
@@ -53,6 +58,8 @@ AUTOMACOES = {
                   "para a substituta; no regresso, as que ficaram por concluir voltam à pessoa original.", "configuravel": None},
     "lembretes_reunioes": {"nome": "Lembretes de reuniões", "descricao": "No dia de cada reunião, cada participante recebe um "
                            "lembrete com a hora, o local e a ordem de trabalhos.", "configuravel": None},
+    "emails": {"nome": "Avisos por email", "descricao": "Envia por email os avisos urgentes (e o resumo semanal a quem o pediu). "
+               "Desligado até a chave do serviço de envio ser configurada no servidor.", "configuravel": None},
     "resumo_semanal": {"nome": "Resumo semanal", "descricao": "À segunda-feira a partir das 07:00: cada pessoa recebe o resumo da sua "
                        "semana (atrasos, prazos, aprovações); a CEO recebe também o da equipa.", "configuravel": "automacao_resumo_semanal"},
     "relatorio_mensal": {"nome": "Relatório mensal da CEO", "descricao": "No início de cada mês, a CEO é avisada de que o relatório do "
@@ -151,7 +158,7 @@ def executar(db: Session, forcar: bool = False) -> dict:
 def _executar(db: Session, forcar: bool) -> dict:
     feitos = {}
     for nome, fn in (("alertas", alertas.verificar if forcar else _alertas_se_necessario),
-                     ("ausencias", ausencias), ("lembretes_reunioes", lembretes_reunioes), ("resumo_semanal", resumo_semanal), ("relatorio_mensal", relatorio_mensal)):
+                     ("ausencias", ausencias), ("lembretes_reunioes", lembretes_reunioes), ("resumo_semanal", resumo_semanal), ("relatorio_mensal", relatorio_mensal), ("emails", emails)):
         if not _activa(db, nome):
             continue
         try:

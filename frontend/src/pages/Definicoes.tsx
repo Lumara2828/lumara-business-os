@@ -46,6 +46,7 @@ export default function Definicoes() {
           <div className="sm:col-span-3"><button className="btn-primario" disabled={!pw.actual || !pw.nova}>Alterar</button></div>
         </form>
       </Seccao>
+      <AvisosEmail />
       {pode("configuracao.gerir") && config.dados && (
         <Seccao titulo="Metas, limites e alertas">
           <ul className="divide-y divide-linho/60">
@@ -78,5 +79,32 @@ export default function Definicoes() {
         </Seccao>
       )}
     </div>
+  );
+}
+
+/** Melhoria nº 3: cada pessoa escolhe que avisos recebe também por email. */
+interface Pref { email_avisos: "nenhum" | "urgentes" | "urgentes_resumo"; email_configurado: boolean; email: string; demo: boolean }
+function AvisosEmail() {
+  const toast = useToast();
+  const pref = useDados(() => api.get<Pref>("/notificacoes/preferencias"));
+  if (!pref.dados) return null;
+  const p = pref.dados;
+  const mudar = async (v: string) => {
+    try { await api.put("/notificacoes/preferencias", { email_avisos: v }); toast("Preferência guardada."); pref.recarregar(); } catch (e) { toast(mensagemErro(e), "erro"); }
+  };
+  return (
+    <Seccao titulo="Avisos por email">
+      <div className="space-y-2 text-sm">
+        <label className="rotulo" htmlFor="email-avisos">O que recebo também em {p.email}</label>
+        <select id="email-avisos" className="campo !w-auto" value={p.email_avisos} onChange={(e) => mudar(e.target.value)}>
+          <option value="urgentes">Só avisos urgentes</option>
+          <option value="urgentes_resumo">Avisos urgentes e o resumo de segunda-feira</option>
+          <option value="nenhum">Nenhum (só na aplicação)</option>
+        </select>
+        <p className="text-xs text-terra-700">Urgentes: tarefas em atraso ou bloqueadas, aprovações paradas, ruptura de stock, contas vencidas, não-conformidades e substituições. Tudo o resto fica só no sino da aplicação.</p>
+        {!p.email_configurado && <p className="text-xs text-aviso">O envio de emails ainda não está ligado: falta a chave do serviço de envio no servidor. A sua escolha fica guardada.</p>}
+        {p.demo && <p className="text-xs text-terra-700">Contas DEMO nunca recebem emails.</p>}
+      </div>
+    </Seccao>
   );
 }

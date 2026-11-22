@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -64,3 +65,28 @@ def marcar_todas(ctx: Contexto = Depends(contexto_actual), db: Session = Depends
 @router.post("/verificar-alertas")
 def verificar_agora(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = Depends(get_db)):
     return alertas.verificar(db)
+
+
+# --- Melhoria nº 3: avisos por email -------------------------------------------------
+
+class PreferenciaEmail(BaseModel):
+    email_avisos: Literal["nenhum", "urgentes", "urgentes_resumo"]
+
+
+@router.get("/preferencias")
+def preferencias(ctx: Contexto = Depends(contexto_actual)):
+    from app.core.config import settings
+    from app.modules.notificacoes.email import URGENTES
+    return {"email_avisos": ctx.utilizador.email_avisos, "email_configurado": settings.email_configurado,
+            "email": ctx.utilizador.email, "demo": ctx.utilizador.is_demo, "tipos_urgentes": sorted(URGENTES)}
+
+
+@router.put("/preferencias")
+def guardar_preferencias(dados: PreferenciaEmail, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
+    from app.core.audit import registar
+    u = db.get(type(ctx.utilizador), ctx.utilizador.id)
+    antigo, u.email_avisos = u.email_avisos, dados.email_avisos
+    registar(db, utilizador_id=u.id, accao="configurar", entidade="utilizador", entidade_id=u.id,
+             resumo=f"Avisos por email: {antigo} → {dados.email_avisos}", ip=ctx.ip)
+    db.commit()
+    return preferencias(Contexto(utilizador=u, sessao=ctx.sessao, ip=ctx.ip))
