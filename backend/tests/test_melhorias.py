@@ -389,3 +389,21 @@ def test_pedidos_entre_colegas(equipa):
     assert diana.get(f"/tarefas/{t2['id']}").status_code == 404  # já não é dela
     # A CEO continua a atribuir directamente, sem pedido.
     assert luisa.post("/tarefas", {"titulo": "Inventário", "responsavel_id": diana.id, "prazo": prazo}).json()["pedido_estado"] is None
+
+
+def test_contactos_no_rodape(equipa):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    cliente = TestClient(app)  # sem sessão iniciada
+    luisa, maira, _ = equipa
+    vazio = cliente.get("/configuracao/contactos-publicos")
+    assert vazio.status_code == 200 and set(vazio.json()) == {"telefone", "email", "morada", "instagram", "facebook"}
+    assert all(v is None for v in vazio.json().values())
+    assert luisa.put("/configuracao/contacto_email", {"valor": "não é email"}).status_code == 400
+    assert luisa.put("/configuracao/contacto_morada", {"valor": "<script>"}).status_code == 400
+    assert maira.put("/configuracao/contacto_telefone", {"valor": "923 000 000"}).status_code == 403
+    assert luisa.put("/configuracao/contacto_instagram", {"valor": "  @lumara.exemplo "}).status_code == 200
+    assert cliente.get("/configuracao/contactos-publicos").json()["instagram"] == "@lumara.exemplo"
+    assert luisa.put("/configuracao/contacto_instagram", {"valor": ""}).status_code == 200
+    assert cliente.get("/configuracao/contactos-publicos").json()["instagram"] is None
+    assert luisa.put("/configuracao/meta_cumprimento_prazos", {"valor": "abc"}).status_code == 400

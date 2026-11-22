@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -34,7 +36,11 @@ LIMITES = {
 
 
 class ValorIn(BaseModel):
-    valor: int | float | str
+    valor: int | float | str | None
+
+
+# Texto livre (contactos públicos do rodapé): até 200 caracteres; vazio apaga.
+CONTACTOS = ("contacto_telefone", "contacto_email", "contacto_morada", "contacto_instagram", "contacto_facebook")
 
 
 FINANCEIROS = {"custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct", "margem_alvo_pct", "cambio_kz_eur",
@@ -51,17 +57,41 @@ def listar(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_d
 def definir(chave: str, dados: ValorIn, ctx: Contexto = Depends(requer(P.CONFIGURACAO_GERIR)), db: Session = Depends(get_db)):
     if chave in FINANCEIROS and not ctx.pode(P.FINANCAS_VER):
         raise ErroNegocio("sem_permissao", "Parâmetro financeiro reservado à CEO.", 403)
-    if chave not in LIMITES:
+    if chave in CONTACTOS:
+        dados.valor = _validar_contacto(chave, dados.valor)
+    elif chave not in LIMITES:
         raise ErroNegocio("chave_invalida", "Este parâmetro não pode ser alterado.")
-    minimo, maximo = LIMITES[chave]
-    if not isinstance(dados.valor, (int, float)) or not (minimo <= dados.valor <= maximo):
-        raise ErroNegocio("valor_invalido", f"O valor deve estar entre {minimo} e {maximo}.")
+    else:
+        minimo, maximo = LIMITES[chave]
+        if isinstance(dados.valor, bool) or not isinstance(dados.valor, (int, float)) or not (minimo <= dados.valor <= maximo):
+            raise ErroNegocio("valor_invalido", f"O valor deve estar entre {minimo} e {maximo}.")
     antigo = service.obter(db, chave)
     service.definir(db, chave, dados.valor)
     registar(db, utilizador_id=ctx.utilizador.id, accao="configurar", entidade="configuracao", entidade_id=chave,
              resumo=f"Alterou «{chave}» de {antigo} para {dados.valor}", alteracoes={chave: [antigo, dados.valor]}, ip=ctx.ip)
     db.commit()
     return {"chave": chave, "valor": dados.valor}
+
+
+def _validar_contacto(chave: str, valor) -> str | None:
+    if valor is None:
+        return None
+    if not isinstance(valor, str):
+        raise ErroNegocio("valor_invalido", "Indique o contacto como texto.")
+    valor = " ".join(valor.split())
+    if not valor:
+        return None
+    if len(valor) > 200 or "<" in valor or ">" in valor:
+        raise ErroNegocio("valor_invalido", "Contacto inválido (até 200 caracteres, sem < nem >).")
+    if chave == "contacto_email" and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", valor):
+        raise ErroNegocio("valor_invalido", "Email inválido.")
+    return valor
+
+
+@router.get("/contactos-publicos")
+def contactos_publicos(db: Session = Depends(get_db)):
+    """Público (página de entrada): só os contactos que a CEO decidiu mostrar no rodapé."""
+    return {c.removeprefix("contacto_"): service.obter(db, c) for c in CONTACTOS}
 
 
 @router.get("/matriz-permissoes")

@@ -30,6 +30,12 @@ PADRAO: dict[str, dict] = {
     "automacao_resumo_semanal": {"valor": 1, "descricao": "Enviar o resumo semanal à segunda-feira (1 = sim, 0 = não)"},
     "automacao_relatorio_mensal": {"valor": 1, "descricao": "Avisar a CEO do relatório mensal no início do mês (1 = sim, 0 = não)"},
     "moeda": {"valor": "AOA", "descricao": "Moeda base (Kwanza)"},
+    # Melhoria nº 4: contactos públicos da Lumara no rodapé da página de entrada (vazios até a CEO os preencher).
+    "contacto_telefone": {"valor": None, "descricao": "Telefone / WhatsApp"},
+    "contacto_email": {"valor": None, "descricao": "Email geral da Lumara"},
+    "contacto_morada": {"valor": None, "descricao": "Morada ou localidade do atelier"},
+    "contacto_instagram": {"valor": None, "descricao": "Instagram (ex.: @lumara)"},
+    "contacto_facebook": {"valor": None, "descricao": "Facebook (nome da página ou ligação)"},
 }
 
 

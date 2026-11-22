@@ -421,6 +421,18 @@ await diana.click("role=dialog >> button:has-text('Aceitar pedido')");
 await diana.click("role=dialog >> button:has-text('Confirmar')");
 await diana.waitForSelector("text=Pedido aceite.");
 
+// --- Melhoria nº 4: contactos no rodapé ---
+await luisa.goto(`${BASE}/definicoes`);
+await luisa.fill("#contacto_morada", "Luanda (exemplo E2E)");
+await luisa.locator("li", { has: luisa.locator("#contacto_morada") }).locator("button:has-text('Guardar')").click();
+await luisa.waitForSelector("text=Contacto actualizado.");
+const anon = await browser.newPage();
+await anon.goto(BASE);
+await anon.waitForSelector("text=Luanda (exemplo E2E) >> visible=true");
+await anon.close();
+await luisa.fill("#contacto_morada", "");
+await luisa.locator("li", { has: luisa.locator("#contacto_morada") }).locator("button:has-text('Guardar')").click();
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");
