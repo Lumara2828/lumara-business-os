@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import TarefaDetalhe from "../components/TarefaDetalhe";
 import { Link, useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import type { EstadoActual, Indicadores, ResumoExecutivo, Tarefa } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Carregando, ErroCaixa, EstadoBadge, Kpi, PrioridadeBadge, Seccao, Vazio } from "../components/ui";
-import { fData, fDataHora, fMoeda, fQtd, MESES, ROTULO_FUNCAO } from "../lib/formato";
+import { fData, fDataHora, fMoeda, fQtd, MESES, ROTULO_FUNCAO, fPct, relativo } from "../lib/formato";
 import { useDados } from "../lib/useDados";
 
 // Paleta validada (CVD/contraste) para as duas séries; o âmbar tem contraste < 3:1,
@@ -26,6 +27,7 @@ interface Executivo {
   serie_semanal: { semana_inicio: string; concluidas: number; criadas: number }[];
   ocorrencias_abertas: Record<string, number>;
   proximos_prazos: Tarefa[];
+  a_aprovar: Tarefa[];
   resumo: ResumoExecutivo;
   modulos: { modulo: string; fase: number; estado: string }[];
   gerado_em: string;
@@ -55,11 +57,11 @@ function CartaoMarketing({ m }: { m: MarketingResumo }) {
     <Seccao titulo="Desempenho do marketing (mês)" accao={<Link to="/marketing" className="text-sm text-folha-700 hover:underline">Ver marketing</Link>}>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
         {v("Publicados / planeados", `${m.publicados}/${m.planeados}`)}
-        {v("Cumprimento do calendário", m.execucao_pct === null ? "—" : `${m.execucao_pct}%`)}
+        {v("Cumprimento do calendário", fPct(m.execucao_pct))}
         {v("A aguardar aprovação", m.em_revisao, m.em_revisao ? "text-aviso" : "")}
         {v("Atrasados", m.atrasados, m.atrasados ? "text-alerta" : "")}
         {v("Alcance", m.alcance ? m.alcance.toLocaleString("pt-PT") : "—")}
-        {v("Envolvimento", m.envolvimento_pct === null ? "—" : `${m.envolvimento_pct.toLocaleString("pt-PT")}%`)}
+        {v("Envolvimento", fPct(m.envolvimento_pct))}
       </div>
       {m.publicados_sem_metricas > 0 && <p className="text-xs text-terra-700 mt-2">{m.publicados_sem_metricas} publicação(ões) sem métricas registadas.</p>}
     </Seccao>
@@ -90,9 +92,10 @@ function rotuloPeriodo(tipo: string, inicio: string) {
 }
 
 function Variacao({ actual, anterior, sufixo = "" }: { actual: number | null; anterior: number | null; sufixo?: string }) {
-  if (actual === null || anterior === null) return <span>Período anterior: {anterior ?? "—"}{anterior !== null ? sufixo : ""}</span>;
+  const n = (v: number) => String(v).replace(".", ",");
+  if (actual === null || anterior === null) return <span>Período anterior: {anterior === null ? "—" : `${n(anterior)}${sufixo}`}</span>;
   const d = Math.round((actual - anterior) * 10) / 10;
-  return <span>Período anterior: {anterior}{sufixo} <b className={d >= 0 ? "text-folha-600" : "text-alerta"}>({d >= 0 ? "+" : ""}{d}{sufixo})</b></span>;
+  return <span>Período anterior: {n(anterior)}{sufixo} <b className={d >= 0 ? "text-folha-600" : "text-alerta"}>({d >= 0 ? "+" : ""}{n(d)}{sufixo})</b></span>;
 }
 
 function PainelExecutivo() {
@@ -100,8 +103,10 @@ function PainelExecutivo() {
   const [tipo, setTipo] = useState<"mes" | "trimestre" | "ano">("mes");
   const [referencia, setReferencia] = useState("");
   const [tabela, setTabela] = useState(false);
+  const [aberta, setAberta] = useState<string | null>(null);
   const { dados: d, erro, recarregar } = useDados(
     () => api.get<Executivo>("/dashboard/executivo", { tipo_periodo: tipo, referencia: referencia || undefined }), [tipo, referencia]);
+  useActualizarAoNotificar(recarregar);
 
   if (erro) return <ErroCaixa texto={erro} aoTentar={recarregar} />;
   if (!d) return <Carregando />;
@@ -148,6 +153,23 @@ function PainelExecutivo() {
         </div>
       </section>
 
+      {d.a_aprovar.length > 0 && (
+        <Seccao className="border-aviso/40" titulo={`A aguardar a sua aprovação (${d.a_aprovar.length})`}>
+          <ul className="divide-y divide-linho/60">
+            {d.a_aprovar.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-3 py-2">
+                <span className="flex-1 min-w-0 text-sm">
+                  <span className="block truncate font-medium">{t.codigo} · {t.titulo}</span>
+                  <span className="text-xs text-terra-700">{t.responsavel.nome}{t.submetida_em ? ` · submetida ${relativo(t.submetida_em)}` : ""} · prazo {fData(t.prazo)}</span>
+                </span>
+                <button className="btn-primario !py-1.5" onClick={() => setAberta(t.id)}>Abrir e decidir</button>
+              </li>
+            ))}
+          </ul>
+        </Seccao>
+      )}
+      <TarefaDetalhe id={aberta} aoFechar={() => setAberta(null)} aoMudar={recarregar} />
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi titulo="Facturação (entregues)" valor={fMoeda(d.vendas.actual.facturacao_kz)} detalhe={<VarKz a={d.vendas.actual.facturacao_kz} b={d.vendas.anterior.facturacao_kz} />} aoClicar={() => navegar("/vendas")} />
         <Kpi titulo="Recebido" valor={fMoeda(d.vendas.actual.recebido_kz)} tom="bom" detalhe={<VarKz a={d.vendas.actual.recebido_kz} b={d.vendas.anterior.recebido_kz} />} />
@@ -160,18 +182,18 @@ function PainelExecutivo() {
         <Kpi titulo="Despesas" valor={fMoeda(d.financas.actual.despesas_total_kz)} detalhe={<VarKz a={d.financas.actual.despesas_total_kz} b={d.financas.anterior.despesas_total_kz} />} aoClicar={() => navegar("/financas")} />
         <Kpi titulo="Resultado operacional" valor={fMoeda(d.financas.actual.resultado_kz)} tom={!d.financas.actual.completo ? "aviso" : Number(d.financas.actual.resultado_kz) >= 0 ? "bom" : "alerta"}
           detalhe={d.financas.actual.completo ? <VarKz a={d.financas.actual.resultado_kz} b={d.financas.anterior.resultado_kz} /> : "Incompleto: há vendas sem custo registado"} />
-        <Kpi titulo="Margem de lucro" valor={d.financas.actual.margem_lucro_pct === null ? "—" : `${d.financas.actual.margem_lucro_pct.replace(".", ",")}%`}
-          detalhe={`Período anterior: ${d.financas.anterior.margem_lucro_pct === null ? "—" : d.financas.anterior.margem_lucro_pct.replace(".", ",") + "%"}`} />
-        <Kpi titulo="Facturação vs meta" valor={d.financas.meta_facturacao_kz ? `${Math.round(100 * Number(d.financas.actual.facturacao_liquida_kz) / Number(d.financas.meta_facturacao_kz))}%` : "—"}
+        <Kpi titulo="Margem de lucro" valor={fPct(d.financas.actual.margem_lucro_pct)}
+          detalhe={`Período anterior: ${fPct(d.financas.anterior.margem_lucro_pct)}`} />
+        <Kpi titulo="Facturação vs meta" valor={d.financas.meta_facturacao_kz ? fPct(Math.round(100 * Number(d.financas.actual.facturacao_liquida_kz) / Number(d.financas.meta_facturacao_kz))) : "—"}
           tom={d.financas.meta_facturacao_kz ? (Number(d.financas.actual.facturacao_liquida_kz) >= Number(d.financas.meta_facturacao_kz) ? "bom" : "aviso") : "neutro"}
           detalhe={d.financas.meta_facturacao_kz ? `Meta ${fMoeda(d.financas.meta_facturacao_kz)} · líquida ${fMoeda(d.financas.actual.facturacao_liquida_kz)}` : "Defina a meta em Definições"} />
       </div>
       <p className="text-xs text-terra-700 -mt-3">Facturação = encomendas entregues; recebido = pagamentos registados; resultado = facturação líquida − custo dos produtos vendidos − despesas − perdas. Por pagar: {fMoeda(d.financas.contas_a_pagar_kz)}{d.financas.contas_vencidas ? ` (${d.financas.contas_vencidas} vencida(s))` : ""}{d.financas.despesas_propostas ? ` · ${d.financas.despesas_propostas} despesa(s) proposta(s)` : ""}.</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi titulo="Cumprimento de prazos" valor={actual.taxa_cumprimento === null ? "—" : `${actual.taxa_cumprimento}%`}
+        <Kpi titulo="Cumprimento de prazos" valor={fPct(actual.taxa_cumprimento)}
           tom={actual.taxa_cumprimento === null ? "neutro" : actual.taxa_cumprimento >= meta ? "bom" : "alerta"}
-          detalhe={<><span>Meta: {meta}%</span><br /><Variacao actual={actual.taxa_cumprimento} anterior={anterior.taxa_cumprimento} sufixo="%" /></>} />
+          detalhe={<><span>Meta: {fPct(meta)}</span><br /><Variacao actual={actual.taxa_cumprimento} anterior={anterior.taxa_cumprimento} sufixo="%" /></>} />
         <Kpi titulo="Concluídas no período" valor={actual.concluidas_no_periodo}
           detalhe={<Variacao actual={actual.concluidas_no_periodo} anterior={anterior.concluidas_no_periodo} />} />
         <Kpi titulo="Tarefas em atraso" valor={ea.em_atraso} tom={ea.em_atraso ? "alerta" : "bom"}
@@ -215,7 +237,7 @@ function PainelExecutivo() {
                   <td className="py-2"><Link to={`/tarefas`} className="font-medium hover:underline">{p.utilizador.nome}</Link><br /><span className="text-xs text-terra-700">{ROTULO_FUNCAO[p.utilizador.funcao]}</span></td>
                   <td className="text-right">{p.actual.pendentes}</td>
                   <td className={`text-right ${p.actual.em_atraso ? "text-alerta font-medium" : ""}`}>{p.actual.em_atraso}</td>
-                  <td className="text-right">{p.periodo.taxa_cumprimento === null ? "—" : `${p.periodo.taxa_cumprimento}%`}</td>
+                  <td className="text-right">{fPct(p.periodo.taxa_cumprimento)}</td>
                 </tr>
               ))}
             </tbody>
@@ -299,6 +321,7 @@ interface Pessoal {
 function PainelPessoal() {
   const { perfil } = useAuth();
   const { dados: d, erro, recarregar } = useDados(() => api.get<Pessoal>("/dashboard/pessoal"));
+  useActualizarAoNotificar(recarregar);
   if (erro) return <ErroCaixa texto={erro} aoTentar={recarregar} />;
   if (!d) return <Carregando />;
   const ea = d.estado_actual;
@@ -313,9 +336,9 @@ function PainelPessoal() {
         <Kpi titulo="Para hoje" valor={ea.para_hoje} />
         <Kpi titulo="Em atraso" valor={ea.em_atraso} tom={ea.em_atraso ? "alerta" : "bom"} />
         <Kpi titulo="Próximos 7 dias" valor={ea.proximos_7_dias} />
-        <Kpi titulo="No prazo este mês" valor={d.mes.taxa_cumprimento === null ? "—" : `${d.mes.taxa_cumprimento}%`}
+        <Kpi titulo="No prazo este mês" valor={fPct(d.mes.taxa_cumprimento)}
           tom={d.mes.taxa_cumprimento === null ? "neutro" : d.mes.taxa_cumprimento >= d.meta_cumprimento ? "bom" : "aviso"}
-          detalhe={`Meta da equipa: ${d.meta_cumprimento}%`} />
+          detalhe={`Meta da equipa: ${fPct(d.meta_cumprimento)}`} />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
         <Seccao titulo="Em atraso"><ListaTarefas tarefas={d.em_atraso} vazio="Nada em atraso. Excelente!" /></Seccao>
@@ -345,4 +368,14 @@ function PainelPessoal() {
       </div>
     </div>
   );
+}
+
+/** O painel volta a carregar quando chega uma notificação nova ou quando algo muda noutra parte da aplicação. */
+function useActualizarAoNotificar(recarregar: () => void) {
+  useEffect(() => {
+    const f = () => recarregar();
+    window.addEventListener("lumara:notificacoes", f);
+    window.addEventListener("lumara:actualizar", f);
+    return () => { window.removeEventListener("lumara:notificacoes", f); window.removeEventListener("lumara:actualizar", f); };
+  }, [recarregar]);
 }

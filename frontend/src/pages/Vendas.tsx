@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { avisarMudanca } from "../components/Layout";
 import { useToast } from "../components/Toast";
 import { Carregando, Demo, ErroCaixa, Kpi, Modal, Seccao, Vazio } from "../components/ui";
-import { CANAIS, ESTADOS_ENCOMENDA, ESTADOS_PAGAMENTO, fData, fDataHora, fMoeda, FORMAS_PAGAMENTO, fQtd, hojeIso, somarDias } from "../lib/formato";
+import { CANAIS, ESTADOS_ENCOMENDA, ESTADOS_PAGAMENTO, fData, fDataHora, fMoeda, FORMAS_PAGAMENTO, fQtd, hojeIso, somarDias, fPct } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 const limpa = (s: string) => s.replace(/^\[DEMO\] /, "");
@@ -431,7 +431,7 @@ function Precos() {
         <tbody className="divide-y divide-linho/60">{dados.map((p) => (
           <tr key={p.artigo.id}><td className="p-3"><span className="flex gap-2 items-center"><Demo ativo={p.artigo.is_demo} />{limpa(p.artigo.nome)}</span><span className="text-xs text-terra-700">{p.artigo.codigo}</span></td>
             <td className="text-right font-medium">{p.preco_kz ? fMoeda(p.preco_kz) : <span className="text-aviso">sem preço</span>}</td><td className="text-right">{fQtd(p.disponivel, p.artigo.unidade)}</td>
-            {ceo && <><td className="text-right">{p.custo_unitario ? fMoeda(p.custo_unitario) : "—"}</td><td className="text-right">{p.margem_bruta_pct ? `${p.margem_bruta_pct.replace(".", ",")}%` : "—"}</td>
+            {ceo && <><td className="text-right">{p.custo_unitario ? fMoeda(p.custo_unitario) : "—"}</td><td className="text-right">{fPct(p.margem_bruta_pct)}</td>
               <td className="text-right pr-3"><button className="btn-fantasma" onClick={() => { setEd(p); setV({ preco: p.preco_kz ?? "", desde: hojeIso(), motivo: "" }); }}>Alterar preço</button></td></>}</tr>))}</tbody></table></div>
       {ceo && <p className="text-xs text-terra-700">Margem bruta = (preço − custo médio de produção) ÷ preço. O custo inclui por agora só materiais; mão-de-obra e outros custos entram com as Finanças (Fase 5).</p>}
       {ed && (

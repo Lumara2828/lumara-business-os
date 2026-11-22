@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import P
 from app.core.tempo import FUSO, formatar_data, hoje, inicio_semana
+from app.core.formato import fkz, fpct
 from app.dependencies import Contexto
 from app.modules.configuracao import service as config
 
@@ -52,18 +53,6 @@ class Consulta:
 
     def disponivel(self, ctx: Contexto) -> bool:
         return not self.permissoes or any(ctx.pode(p) for p in self.permissoes)
-
-
-def fkz(v) -> str:
-    q = Decimal(v).quantize(Decimal("0.01"))
-    inteiro, dec = f"{q:.2f}".split(".")
-    neg = inteiro.startswith("-")
-    inteiro = inteiro.lstrip("-")
-    grupos = []
-    while inteiro:
-        grupos.insert(0, inteiro[-3:])
-        inteiro = inteiro[:-3]
-    return ("-" if neg else "") + ".".join(grupos) + f",{dec} Kz"
 
 
 def _qtd(v, unidade: str = "") -> str:
@@ -120,7 +109,7 @@ def desempenho_equipa(db: Session, ctx: Contexto) -> Resultado:
     for u in db.scalars(select(Utilizador).where(Utilizador.activo.is_(True)).order_by(Utilizador.nome)):
         i = indicadores_periodo(db, ini, fim, u.id)
         taxa = i["taxa_cumprimento"]
-        linhas.append([u.nome, i["tarefas_com_prazo"], i["concluidas"], i["em_atraso"], f"{taxa}%".replace(".", ",") if taxa is not None else "—"])
+        linhas.append([u.nome, i["tarefas_com_prazo"], i["concluidas"], i["em_atraso"], fpct(taxa)])
     return Resultado(f"Execução da semana de {formatar_data(ini)} a {formatar_data(fim)}, por pessoa.",
                      ["Pessoa", "Com prazo na semana", "Concluídas", "Em atraso", "Cumprimento"], linhas, "/rotina")
 
@@ -290,7 +279,7 @@ def resultado_mes(db: Session, ctx: Contexto) -> Resultado:
     r = resultados(db, d.year, d.month)
     linhas = [["Facturação líquida", fkz(r["facturacao_liquida_kz"])],
               ["Custo dos produtos vendidos", fkz(r["custo_mercadorias_vendidas_kz"])],
-              ["Margem bruta", fkz(r["margem_bruta_kz"]) + (f" ({r['margem_bruta_pct']}%)".replace(".", ",") if r["margem_bruta_pct"] else " (por calcular)")],
+              ["Margem bruta", fkz(r["margem_bruta_kz"]) + (f" ({fpct(r['margem_bruta_pct'])})" if r["margem_bruta_pct"] else " (por calcular)")],
               ["Despesas", fkz(r["despesas_total_kz"])], ["Perdas de stock", fkz(r["perdas_stock_kz"])],
               ["Resultado operacional", fkz(r["resultado_kz"])],
               ["Caixa do mês (entradas − saídas)", fkz(r["caixa"]["saldo_kz"])]]

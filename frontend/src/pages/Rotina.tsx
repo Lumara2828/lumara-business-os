@@ -5,7 +5,7 @@ import type { Indicadores, Tarefa } from "../api/types";
 import { avisarMudanca } from "../components/Layout";
 import { useToast } from "../components/Toast";
 import { Carregando, ErroCaixa, EstadoBadge, Seccao } from "../components/ui";
-import { fData, fDataHora, hojeIso, ROTULO_FUNCAO, segundaDe, somarDias } from "../lib/formato";
+import { fData, fDataHora, hojeIso, ROTULO_FUNCAO, segundaDe, somarDias, fPct } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 interface Linha { id: string; codigo: string; titulo: string; responsavel: string; prazo: string; estado: Tarefa["estado"];
@@ -99,7 +99,7 @@ export default function Rotina() {
               <tbody className="divide-y divide-linho/60">{r.por_pessoa.map((p) => (
                 <tr key={p.nome}><td className="py-2">{p.nome}</td><td className="text-right">{p.tarefas_com_prazo}</td><td className="text-right">{p.concluidas_semana}</td>
                   <td className="text-right">{p.concluidas_no_prazo}</td>
-                  <td className={`text-right font-medium ${p.taxa_cumprimento !== null && p.taxa_cumprimento < r.meta_cumprimento ? "text-alerta" : "text-folha-700"}`}>{p.taxa_cumprimento === null ? "—" : `${p.taxa_cumprimento}%`}</td>
+                  <td className={`text-right font-medium ${p.taxa_cumprimento !== null && p.taxa_cumprimento < r.meta_cumprimento ? "text-alerta" : "text-folha-700"}`}>{fPct(p.taxa_cumprimento)}</td>
                   <td className="text-right">{p.em_atraso_total}</td><td className="text-right">{p.bloqueadas}</td></tr>))}
               </tbody></table></div>
           </Seccao>

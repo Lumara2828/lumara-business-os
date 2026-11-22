@@ -13,6 +13,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.formato import fkz, fpct  # noqa: F401
 from app.core.tempo import FUSO, hoje
 from app.modules.configuracao import service as config
 from app.modules.financas.models import CategoriaFinanceira, Lancamento, Orcamento
@@ -76,7 +77,7 @@ def ficha_custos(db: Session) -> list[dict]:
         if margem is not None and margem < 0:
             alerta = "Margem negativa: o preço não cobre o custo."
         elif margem_pct is not None and margem_min is not None and margem_pct < Decimal(str(margem_min)):
-            alerta = f"Margem abaixo do mínimo definido ({margem_min}%)."
+            alerta = f"Margem abaixo do mínimo definido ({fpct(margem_min)})."
         res.append({"ficha_id": f.id, "ficha": f"{f.codigo} v{f.versao}", "produto": {"id": f.produto.id, "nome": f.produto.nome, "unidade": f.produto.unidade},
                     "materias_primas_kz": str(d2(mp)), "embalagens_kz": str(d2(emb)), "mao_obra_kz": None if mo is None else str(d2(mo)),
                     "outros_kz": None if outros is None else str(d2(outros)), "custo_total_kz": str(d2(total)), "preco_kz": None if preco is None else str(preco),

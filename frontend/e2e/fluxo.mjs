@@ -80,15 +80,28 @@ await maira.waitForSelector("role=dialog");
 await maira.selectOption("role=dialog >> select", "aguardar_aprovacao");
 await maira.fill("role=dialog >> textarea[placeholder='Comentário (opcional)']", "Legenda pronta para revisão.");
 await maira.click("role=dialog >> button:has-text('Confirmar')");
-await maira.waitForSelector("role=dialog >> text=A aguardar aprovação");
+await maira.waitForSelector("role=dialog", { state: "detached" }); // a janela fecha depois de decidir
+await maira.waitForSelector("text=Estado actualizado.");
 await foto(maira, "10-maira-submete");
 
-// --- CEO aprova ---
-await luisa.goto(`${BASE}/excepcoes`);
-await luisa.click("text=E2E: legenda para publicação");
+// --- CEO aprova a partir do painel ---
+await luisa.goto(`${BASE}/`);
+await luisa.waitForSelector("text=A aguardar a sua aprovação");
+await foto(luisa, "10b-painel-a-aprovar");
+const aAprovar = luisa.locator("section", { hasText: "A aguardar a sua aprovação" }).locator("li", { hasText: "E2E: legenda para publicação" });
+const antes = await aAprovar.count();
+await aAprovar.last().locator("button:has-text('Abrir e decidir')").click();
 await luisa.waitForSelector("role=dialog >> button:has-text('Aprovar')");
 await luisa.click("role=dialog >> button:has-text('Aprovar')");
 await luisa.click("role=dialog >> button:has-text('Confirmar')");
+await luisa.waitForSelector("role=dialog", { state: "detached" });
+await luisa.waitForSelector("text=Trabalho aprovado.");
+await luisa.waitForFunction((n) => [...document.querySelectorAll("li")].filter((l) => l.textContent.includes("E2E: legenda para publicação") && l.querySelector("button")).length === n - 1, antes);
+await luisa.goto(`${BASE}/tarefas`);
+await luisa.click("role=tab[name='Lista']");
+await luisa.uncheck("text=Ocultar concluídas");
+await luisa.fill("input[aria-label='Pesquisar']", "E2E: legenda");
+await luisa.locator("table tr", { hasText: "Concluída" }).filter({ hasText: "E2E: legenda" }).first().click();
 await luisa.waitForSelector("role=dialog >> text=Concluída");
 await luisa.click("role=dialog >> role=tab[name='Histórico']");
 await luisa.waitForSelector("text=Aprovou");

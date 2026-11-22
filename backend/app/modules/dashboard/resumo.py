@@ -8,6 +8,7 @@ from datetime import timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.formato import fkz, fpct  # noqa: F401
 from app.core.tempo import formatar_data, hoje, inicio_semana, periodo
 from app.modules.configuracao import service as config
 from app.modules.dashboard import metricas
@@ -36,12 +37,12 @@ def resumo_executivo(db: Session) -> dict:
         estado = "Ainda não há tarefas com prazo vencido este mês para medir o cumprimento."
         nivel = "neutro"
     elif taxa >= meta and act["em_atraso"] == 0:
-        estado, nivel = f"Operação em dia: {taxa}% das tarefas vencidas este mês foram cumpridas no prazo (meta {meta}%).", "bom"
+        estado, nivel = f"Operação em dia: {fpct(taxa)} das tarefas vencidas este mês foram cumpridas no prazo (meta {fpct(meta)}).", "bom"
     elif taxa >= meta:
-        estado, nivel = (f"Cumprimento acima da meta ({taxa}% vs {meta}%), mas há {act['em_atraso']} tarefa(s) em atraso a "
+        estado, nivel = (f"Cumprimento acima da meta ({fpct(taxa)} vs {fpct(meta)}), mas há {act['em_atraso']} tarefa(s) em atraso a "
                          "acompanhar."), "atencao"
     else:
-        estado, nivel = f"Cumprimento abaixo da meta: {taxa}% no prazo (meta {meta}%), {act['em_atraso']} tarefa(s) em atraso.", "critico"
+        estado, nivel = f"Cumprimento abaixo da meta: {fpct(taxa)} no prazo (meta {fpct(meta)}), {act['em_atraso']} tarefa(s) em atraso.", "critico"
     from app.modules.vendas.router import indicadores
     from app.modules.vendas.service import fkz
     v = indicadores(db, ini, fim)
@@ -56,7 +57,7 @@ def resumo_executivo(db: Session) -> dict:
     for p in equipa:
         t = p["periodo"]["taxa_cumprimento"]
         if t is not None and t >= meta and p["periodo"]["vencidas"] > 0:
-            bem.append(f"{p['utilizador']['nome']}: {t}% das tarefas no prazo este mês.")
+            bem.append(f"{p['utilizador']['nome']}: {fpct(t)} das tarefas no prazo este mês.")
     if ind["concluidas_no_periodo"]:
         bem.append(f"{ind['concluidas_no_periodo']} tarefa(s) concluída(s) este mês.")
     if not ocorrencias:
@@ -90,10 +91,10 @@ def resumo_executivo(db: Session) -> dict:
     from app.modules.financas import service as fin
     for p in fin.ficha_custos(db):
         if p["alerta"]:
-            perdas.append(f"{p['produto']['nome']}: {p['alerta']} (preço {p['preco_kz']} Kz, custo {p['custo_total_kz']} Kz).")
+            perdas.append(f"{p['produto']['nome']}: {p['alerta']} (preço {fkz(p['preco_kz'])}, custo {fkz(p['custo_total_kz'])}).")
     for o in fin.orcamento_vs_real(db, d.year, d.month):
         if o["excedido"]:
-            perdas.append(f"Orçamento de «{o['categoria']['nome']}» excedido: {o['realizado_kz']} de {o['orcamento_kz']} Kz.")
+            perdas.append(f"Orçamento de «{o['categoria']['nome']}» excedido: {fkz(o['realizado_kz'])} de {fkz(o['orcamento_kz'])}.")
     r = fin.resultados(db, d.year, d.month)
     if r["devolucoes_kz"] != "0.00":
         perdas.append(f"Devoluções este mês: {fkz(r['devolucoes_kz'])}.")

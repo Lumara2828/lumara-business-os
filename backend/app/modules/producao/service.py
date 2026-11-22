@@ -16,6 +16,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.formato import fpct
 from app.core.audit import registar
 from app.core.errors import ErroNegocio, proibido
 from app.core.permissions import P
@@ -127,7 +128,7 @@ def concluir(db: Session, ctx: Contexto, o: OrdemProducao, quantidade_produzida:
     rendimento = (quantidade_produzida / o.quantidade_planeada * 100).quantize(Decimal("0.1"))
     registar(db, utilizador_id=ctx.utilizador.id, accao="concluir", entidade="ordem_producao", entidade_id=o.id,
              resumo=f"Concluiu {ref}: {stock.fmt_qtd(quantidade_produzida, o.produto.unidade)} de {o.produto.nome} "
-                    f"(planeado {stock.fmt_qtd(o.quantidade_planeada, o.produto.unidade)}, {rendimento}%), "
+                    f"(planeado {stock.fmt_qtd(o.quantidade_planeada, o.produto.unidade)}, {fpct(rendimento)}), "
                     f"lote {m.lote.numero}, validade {formatar_data(validade)}", ip=ctx.ip)
     if o.tarefa_id:
         t = db.get(Tarefa, o.tarefa_id)

@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { avisarMudanca } from "../components/Layout";
 import { useToast } from "../components/Toast";
 import { Carregando, Demo, ErroCaixa, Kpi, Modal, Seccao, Vazio } from "../components/ui";
-import { ESTADOS_LANCAMENTO, fData, fMoeda, FORMAS_PAGAMENTO, hojeIso, MESES, NATUREZAS } from "../lib/formato";
+import { ESTADOS_LANCAMENTO, fData, fMoeda, FORMAS_PAGAMENTO, hojeIso, MESES, NATUREZAS, fPct } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 const limpa = (s: string) => s.replace(/^\[DEMO\] /, "");
@@ -82,7 +82,7 @@ function Resultados() {
         <Kpi titulo="Despesas" valor={fMoeda(r.despesas_total_kz)} detalhe={`Fixas ${fMoeda(r.despesas_fixas_kz)} · variáveis ${fMoeda(r.despesas_variaveis_kz)}`} />
         <Kpi titulo="Resultado operacional" valor={fMoeda(r.resultado_kz)} tom={!r.completo ? "aviso" : Number(r.resultado_kz) >= 0 ? "bom" : "alerta"}
           detalhe={r.completo ? `Mês anterior: ${fMoeda(a.resultado_kz)}` : "Incompleto: há vendas sem custo registado (sobrestimado)"} />
-        <Kpi titulo="Margem de lucro" valor={r.margem_lucro_pct === null ? "—" : `${r.margem_lucro_pct.replace(".", ",")}%`}
+        <Kpi titulo="Margem de lucro" valor={fPct(r.margem_lucro_pct)}
           detalhe={!r.completo ? "Por calcular até haver custos de todos os produtos vendidos" : `Margem bruta ${r.margem_bruta_pct === null ? "—" : r.margem_bruta_pct.replace(".", ",") + "%"}`} />
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
@@ -291,7 +291,7 @@ function Orcamento() {
               <td className="text-right"><input type="number" min={0} step="any" aria-label={`Orçamento ${o.categoria.nome}`} className="campo !w-32 !py-1 text-right"
                 value={v[o.categoria.id] ?? (o.orcamento_kz ?? "")} onChange={(e) => setV({ ...v, [o.categoria.id]: e.target.value })} /></td>
               <td className="text-right">{fMoeda(o.realizado_kz)}</td><td className="text-right text-terra-700">{Number(o.propostas_kz) ? fMoeda(o.propostas_kz) : "—"}</td>
-              <td className={`text-right pr-3 ${o.excedido ? "text-alerta font-medium" : ""}`}>{o.utilizacao_pct ? `${o.utilizacao_pct.replace(".", ",")}%` : o.sem_orcamento_com_gasto ? "sem orçamento" : "—"}</td></tr>))}</tbody></table></div>
+              <td className={`text-right pr-3 ${o.excedido ? "text-alerta font-medium" : ""}`}>{o.utilizacao_pct ? fPct(o.utilizacao_pct) : o.sem_orcamento_com_gasto ? "sem orçamento" : "—"}</td></tr>))}</tbody></table></div>
       )}
       <button className="btn-primario" disabled={!Object.keys(v).length} onClick={guardar}>Guardar orçamento</button>
     </div>

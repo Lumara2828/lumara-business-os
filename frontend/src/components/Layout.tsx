@@ -121,8 +121,14 @@ function Sino() {
   const navegar = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
 
+  const anteriores = useRef<number | null>(null);
   const carregar = useCallback(() => {
-    api.get<{ nao_lidas: number; itens: Notificacao[] }>("/notificacoes").then(setDados).catch(() => {});
+    api.get<{ nao_lidas: number; itens: Notificacao[] }>("/notificacoes").then((r) => {
+      // Notificação nova → os painéis abertos voltam a carregar (ex.: tarefa submetida para aprovação).
+      if (anteriores.current !== null && r.nao_lidas > anteriores.current) window.dispatchEvent(new Event("lumara:notificacoes"));
+      anteriores.current = r.nao_lidas;
+      setDados(r);
+    }).catch(() => {});
   }, []);
   useEffect(() => {
     carregar();

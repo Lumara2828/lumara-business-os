@@ -21,6 +21,7 @@ from datetime import timedelta
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core.formato import fkz, fpct  # noqa: F401
 from app.core.tempo import agora, formatar_data, hoje, inicio_semana
 from app.modules.automacao import alertas
 from app.modules.configuracao import service as config
@@ -82,7 +83,7 @@ def resumo_semanal(db: Session) -> dict:
         if e["bloqueadas"]:
             partes.append(f"Bloqueadas: {e['bloqueadas']}.")
         if i["taxa_cumprimento"] is not None:
-            partes.append(f"Semana passada: {i['taxa_cumprimento']}% no prazo.")
+            partes.append(f"Semana passada: {fpct(i['taxa_cumprimento'])} no prazo.")
         notificar(db, u.id, "resumo_semanal", f"Resumo da semana de {formatar_data(seg)}", " ".join(partes), "/tarefas",
                   chave_dedup=f"resumo-semana:{u.id}:{seg.isoformat()}")
         n += 1
@@ -90,7 +91,7 @@ def resumo_semanal(db: Session) -> dict:
             eq = estado_actual(db)
             ie = indicadores_periodo(db, ant_ini, ant_fim)
             msg = (f"Equipa: {eq['em_atraso']} em atraso, {eq['bloqueadas']} bloqueada(s), {eq['aguardar_aprovacao']} a aguardar a sua aprovação. "
-                   + (f"Cumprimento na semana passada: {ie['taxa_cumprimento']}%." if ie["taxa_cumprimento"] is not None else ""))
+                   + (f"Cumprimento na semana passada: {fpct(ie['taxa_cumprimento'])}." if ie["taxa_cumprimento"] is not None else ""))
             notificar(db, u.id, "resumo_semanal", "Resumo da equipa — planeamento de segunda-feira", msg.strip(), "/rotina",
                       chave_dedup=f"resumo-equipa:{u.id}:{seg.isoformat()}")
     db.commit()

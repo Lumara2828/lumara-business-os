@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { Carregando, ErroCaixa, Kpi, Seccao } from "../components/ui";
-import { fData, fMoeda, fQtd, TIPOS_OCORRENCIA } from "../lib/formato";
+import { fData, fMoeda, fQtd, TIPOS_OCORRENCIA, fPct } from "../lib/formato";
 import { useDados } from "../lib/useDados";
 
 interface Fin {
@@ -66,7 +66,7 @@ function Linha({ rotulo, a, b, dinheiro = true }: { rotulo: string; a: string | 
 
 function Conteudo({ r }: { r: Relatorio }) {
   const fa = r.financas.actual, fb = r.financas.anterior, va = r.vendas.actual, vb = r.vendas.anterior, t = r.tarefas.equipa;
-  const pct = (v: string | number | null) => (v === null ? "por calcular" : `${String(v).replace(".", ",")}%`);
+  const pct = (v: string | number | null) => (v === null ? "por calcular" : fPct(v));
   // Sem custo de todas as vendas, margem e resultado não são fiáveis: mostra «por calcular».
   const fiavel = (f: Fin, v: string) => (f.completo ? v : "por calcular");
   return (

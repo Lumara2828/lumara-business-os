@@ -40,9 +40,13 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
 
   const depois = async (msg: string) => { toast(msg); avisarMudanca(); aoMudar(); if (id) await carregar(id); };
 
-  const executar = async (accao: () => Promise<unknown>, msg: string) => {
+  // Decisões (guardar, aprovar, devolver, mudar estado) fecham a janela; comentários e anexos mantêm-na aberta.
+  const executar = async (accao: () => Promise<unknown>, msg: string, fechar = true) => {
     setOcupado(true);
-    try { await accao(); await depois(msg); setPedido(null); setMotivo(""); }
+    try {
+      await accao(); setPedido(null); setMotivo("");
+      if (fechar) { toast(msg); avisarMudanca(); aoMudar(); aoFechar(); } else await depois(msg);
+    }
     catch (e) { toast(mensagemErro(e), "erro"); }
     finally { setOcupado(false); }
   };
@@ -64,7 +68,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
 
   const comentar = async () => {
     if (!t || !texto.trim()) return;
-    await executar(() => api.post(`/tarefas/${t.id}/comentarios`, { texto }), "Comentário adicionado.");
+    await executar(() => api.post(`/tarefas/${t.id}/comentarios`, { texto }), "Comentário adicionado.", false);
     setTexto("");
   };
 
@@ -73,7 +77,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
     if (ficheiro.size > 8 * 1024 * 1024) return toast("O ficheiro excede 8 MB.", "erro");
     const fd = new FormData();
     fd.append("ficheiro", ficheiro);
-    await executar(() => api.upload(`/tarefas/${t.id}/anexos`, fd), "Ficheiro anexado.");
+    await executar(() => api.upload(`/tarefas/${t.id}/anexos`, fd), "Ficheiro anexado.", false);
     setAba("anexos");
   };
 
@@ -186,7 +190,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
                     <div className="flex gap-1 shrink-0">
                       <button className="btn-secundario" onClick={() => api.descarregar(`/tarefas/${t.id}/anexos/${a.id}`, a.nome_ficheiro).catch((e) => toast(mensagemErro(e), "erro"))}>Descarregar</button>
                       <button className="btn-fantasma text-alerta" aria-label="Remover anexo"
-                        onClick={() => confirm("Remover este anexo?") && executar(() => api.del(`/tarefas/${t.id}/anexos/${a.id}`), "Anexo removido.")}>✕</button>
+                        onClick={() => confirm("Remover este anexo?") && executar(() => api.del(`/tarefas/${t.id}/anexos/${a.id}`), "Anexo removido.", false)}>✕</button>
                     </div>
                   </div>
                 ))}
@@ -208,7 +212,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
               </ol>
             )}
           </div>
-          <TarefaForm aberto={editar} tarefa={t} aoFechar={() => setEditar(false)} aoGuardar={() => { setEditar(false); depois("Guardado."); }} />
+          <TarefaForm aberto={editar} tarefa={t} aoFechar={() => setEditar(false)} aoGuardar={() => { setEditar(false); toast("Tarefa guardada."); avisarMudanca(); aoMudar(); aoFechar(); }} />
         </div>
       )}
     </Modal>

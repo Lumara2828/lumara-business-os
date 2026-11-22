@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.formato import fkz, fpct  # noqa: F401
 from app.core.audit import registar
 from app.core.database import get_db
 from app.core.errors import conflito, nao_encontrado
@@ -59,7 +60,7 @@ def calcular_relatorio(db: Session, segunda: date) -> dict:
 
     destaques = []
     if geral["taxa_cumprimento"] is not None:
-        destaques.append(f"Cumprimento de prazos da semana: {geral['taxa_cumprimento']}% (meta {meta}%).")
+        destaques.append(f"Cumprimento de prazos da semana: {fpct(geral['taxa_cumprimento'])} (meta {fpct(meta)}).")
     destaques.append(f"{len(concluidas)} tarefa(s) concluída(s); {len(atrasadas)} em atraso; {len(bloqueadas)} bloqueada(s).")
     if aprovacao:
         destaques.append(f"{len(aprovacao)} trabalho(s) a aguardar aprovação da CEO.")

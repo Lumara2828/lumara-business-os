@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.formato import fkz, fpct  # noqa: F401
 from app.core.database import get_db
 from app.core.permissions import P
 from app.core.tempo import agora, formatar_data, hoje, periodo, periodo_anterior
@@ -56,6 +57,8 @@ def executivo(
     anterior = metricas.indicadores_periodo(db, ini_ant, fim_ant)
     meta = config.obter(db, "meta_cumprimento_prazos")
     proximas = tarefas.listar(db, ctx, prazo_de=hoje(), prazo_ate=hoje() + timedelta(days=7), incluir_concluidas=False, limite=15)
+    a_aprovar = sorted(tarefas.listar(db, ctx, estados=["aguardar_aprovacao"], limite=30),
+                       key=lambda t: t.submetida_em or t.actualizada_em)
     return {
         "periodo": {"tipo": tipo_periodo, "inicio": ini, "fim": fim, "anterior_inicio": ini_ant, "anterior_fim": fim_ant},
         "estado_actual": metricas.estado_actual(db),
@@ -64,6 +67,7 @@ def executivo(
         "serie_semanal": metricas.serie_semanal(db),
         "ocorrencias_abertas": metricas.ocorrencias_abertas(db),
         "proximos_prazos": [tarefas.para_saida(ctx, t) for t in proximas],
+        "a_aprovar": [tarefas.para_saida(ctx, t) for t in a_aprovar],
         "resumo": resumo_executivo(db),
         "stock": _stock_resumo(db),
         "producao": producao_svc.estado_producao(db),
@@ -257,12 +261,12 @@ def excepcoes(ctx: Contexto = Depends(requer(P.EXCEPCOES_VER)), db: Session = De
     desvios = []
     if ind["taxa_cumprimento"] is not None and ind["taxa_cumprimento"] < meta:
         desvios.append({"indicador": "Cumprimento de prazos (mês)", "meta": meta, "actual": ind["taxa_cumprimento"],
-                        "mensagem": f"{ind['taxa_cumprimento']}% das tarefas vencidas este mês foram concluídas no prazo (meta {meta}%)."})
+                        "mensagem": f"{fpct(ind['taxa_cumprimento'])} das tarefas vencidas este mês foram concluídas no prazo (meta {fpct(meta)})."})
     for p in metricas.por_pessoa(db, ini, fim):
         taxa = p["periodo"]["taxa_cumprimento"]
         if taxa is not None and taxa < meta and p["periodo"]["vencidas"] >= 3:
             desvios.append({"indicador": f"Cumprimento — {p['utilizador']['nome']}", "meta": meta, "actual": taxa,
-                            "mensagem": f"{p['utilizador']['nome']}: {taxa}% no prazo este mês."})
+                            "mensagem": f"{p['utilizador']['nome']}: {fpct(taxa)} no prazo este mês."})
 
     seccoes = {
         "aprovacoes": [saida(t) for t in abertas if t.estado == "aguardar_aprovacao"],

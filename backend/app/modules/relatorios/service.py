@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tempo import FUSO, formatar_data, hoje
-from app.modules.assistente.consultas import fkz
+from app.core.formato import fkz, fpct
 from app.modules.financas.service import mes as limites_mes, mes_anterior
 
 MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
@@ -23,8 +23,7 @@ def nome_mes(ano: int, m: int) -> str:
     return f"{MESES[m - 1]} de {ano}"
 
 
-def pct(v) -> str:
-    return f"{v}".replace(".", ",") + "%"
+pct = fpct
 
 
 def _var_pct(actual: Decimal, anterior: Decimal) -> str | None:

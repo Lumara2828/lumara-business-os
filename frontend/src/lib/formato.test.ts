@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fData, fMoeda, segundaDe, somarDias } from "./formato";
+import { fData, fMoeda, fPct, segundaDe, somarDias } from "./formato";
 
 describe("formatação PT", () => {
   it("datas em DD/MM/AAAA", () => {
@@ -7,7 +7,12 @@ describe("formatação PT", () => {
     expect(fData(null)).toBe("—");
   });
   it("Kwanza", () => {
-    expect(fMoeda(1234567.5).replace(/\s/g, " ")).toBe("1 234 567,50 Kz");
+    expect(fMoeda(1234567.5)).toBe("1.234.567,50 Kz");
+    expect(fMoeda("9000")).toBe("9.000,00 Kz");
+    expect(fMoeda(-250)).toBe("-250,00 Kz");
+    expect(fPct(54.5)).toBe("54,5%");
+    expect(fPct("100.0")).toBe("100%");
+    expect(fPct(null)).toBe("—");
   });
   it("aritmética de datas sem fuso", () => {
     expect(somarDias("2026-02-28", 1)).toBe("2026-03-01");

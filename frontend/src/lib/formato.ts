@@ -42,12 +42,22 @@ export function segundaDe(iso: string): string {
   return isoData(d);
 }
 
-/** Kwanza: 1 234 567,89 Kz (preparado para outras moedas). */
+/** Kwanza: 1.234.567,89 Kz — ponto nos milhares e vírgula decimal, também com 4 dígitos (9.000,00). */
 export function fMoeda(valor: number | string | null | undefined, moeda = "AOA"): string {
   if (valor === null || valor === undefined || valor === "") return "—";
   const n = Number(valor);
-  const s = new Intl.NumberFormat("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  if (!Number.isFinite(n)) return "—";
+  const [inteiro, dec] = Math.abs(n).toFixed(2).split(".");
+  const s = `${n < 0 ? "-" : ""}${inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${dec}`;
   return moeda === "AOA" ? `${s} Kz` : `${s} ${moeda}`;
+}
+
+/** Percentagem com vírgula decimal: 54,5% (— quando não há valor). */
+export function fPct(valor: number | string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === "") return "—";
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return "—";
+  return `${String(Math.round(n * 10) / 10).replace(".", ",")}%`;
 }
 
 export function fTamanho(b: number): string {

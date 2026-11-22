@@ -35,9 +35,7 @@ def kz(v) -> Decimal:
     return Decimal(v).quantize(C2, rounding=ROUND_HALF_UP)
 
 
-def fkz(v) -> str:
-    texto = f"{kz(v):,.2f}".replace(",", " ").replace(".", ",")
-    return f"{texto} Kz"
+from app.core.formato import fkz  # noqa: E402,F401  (formato único: 36.000,00 Kz)
 
 
 def codigo(e: Encomenda) -> str:

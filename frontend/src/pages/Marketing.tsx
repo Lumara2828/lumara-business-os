@@ -6,7 +6,7 @@ import AssistenteIA from "../components/AssistenteIA";
 import ConteudoDetalhe, { EstadoConteudoBadge } from "../components/ConteudoDetalhe";
 import { useToast } from "../components/Toast";
 import { Carregando, Demo, ErroCaixa, Kpi, Modal, Seccao, Vazio } from "../components/ui";
-import { CATEGORIAS_CONTEUDO, COR_CATEGORIA, DIAS_SEMANA, ESTADOS_CONTEUDO, fData, FORMATOS, fMoeda, hojeIso, isoData, MESES, PLATAFORMAS } from "../lib/formato";
+import { CATEGORIAS_CONTEUDO, COR_CATEGORIA, DIAS_SEMANA, ESTADOS_CONTEUDO, fData, FORMATOS, fMoeda, hojeIso, isoData, MESES, PLATAFORMAS, fPct } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 
 type Aba = "calendario" | "fluxo" | "campanhas" | "desempenho" | "ideias" | "importar" | "marca" | "integracoes";
@@ -149,7 +149,7 @@ function Desempenho() {
   const tabela = (g: Record<string, Grupo>, rot: Record<string, string>) => (
     <table className="w-full text-sm"><thead className="text-xs text-terra-700"><tr><th className="text-left pb-1"></th><th className="text-right">Planeados</th><th className="text-right">Publicados</th><th className="text-right">Alcance</th><th className="text-right">Envolvimento</th></tr></thead>
       <tbody className="divide-y divide-linho/60">{Object.entries(g).map(([k, x]) => <tr key={k}><td className="py-1.5">{rot[k] ?? k}</td><td className="text-right">{x.planeados}</td><td className="text-right">{x.publicados}</td>
-        <td className="text-right">{x.com_metricas ? x.alcance.toLocaleString("pt-PT") : "—"}</td><td className="text-right">{x.envolvimento_pct === null ? "—" : `${x.envolvimento_pct.toLocaleString("pt-PT")}%`}</td></tr>)}</tbody></table>);
+        <td className="text-right">{x.com_metricas ? x.alcance.toLocaleString("pt-PT") : "—"}</td><td className="text-right">{fPct(x.envolvimento_pct)}</td></tr>)}</tbody></table>);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-end"><div><label className="rotulo">De</label><input type="date" className="campo" value={de} onChange={(e) => setDe(e.target.value)} /></div>

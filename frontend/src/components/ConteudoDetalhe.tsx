@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import type { Campanha, Conteudo, UtilizadorResumo } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { CATEGORIAS_CONTEUDO, ESTADOS_CONTEUDO, fData, fDataHora, fTamanho, FORMATOS, PLATAFORMAS } from "../lib/formato";
+import { CATEGORIAS_CONTEUDO, ESTADOS_CONTEUDO, fData, fDataHora, fTamanho, FORMATOS, PLATAFORMAS, fPct } from "../lib/formato";
 import { mensagemErro, useDados } from "../lib/useDados";
 import AssistenteIA, { textoPlano, type TipoIA } from "./AssistenteIA";
 import { avisarMudanca } from "./Layout";
@@ -221,7 +221,7 @@ function Metricas({ c, aoGuardar }: { c: Conteudo; aoGuardar: (x: Conteudo) => v
       <p className="text-xs text-terra-700">Copie os números das estatísticas da plataforma (Instagram Insights, Meta Business Suite…). A importação automática fica disponível com as integrações da Fase 6.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{CAMPOS_M.map(([k, r]) => <div key={k}><label className="rotulo">{r}</label>
         <input type="number" min={0} className="campo" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></div>)}</div>
-      {c.envolvimento_pct !== null && <p className="text-sm">Taxa de envolvimento: <b>{c.envolvimento_pct.toLocaleString("pt-PT")}%</b> (gostos + comentários + partilhas + guardados ÷ alcance)</p>}
+      {c.envolvimento_pct !== null && <p className="text-sm">Taxa de envolvimento: <b>{fPct(c.envolvimento_pct)}</b> (gostos + comentários + partilhas + guardados ÷ alcance)</p>}
       <button className="btn-primario" onClick={guardar}>Guardar métricas</button>
     </div>
   );
