@@ -47,18 +47,17 @@ CAMPOS = {
     "estado": ["estado", "status", "situacao"],
     "notas_producao": ["notas", "observacoes", "obs", "guiao", "imagem", "video", "visual"],
 }
-ROTULOS = {"data_publicacao": "Data de publicação", "hora_publicacao": "Hora", "plataforma": "Plataforma", "categoria": "Categoria",
+ROTULOS = {"data_publicacao": "Data de publicação", "hora_publicacao": "Hora", "plataforma": "Plataforma", "categoria": "Pilar",
            "formato": "Formato", "tema": "Tema", "objectivo": "Objectivo", "texto": "Texto / legenda", "hashtags": "Hashtags",
            "cta": "Chamada para acção", "responsavel": "Responsável", "estado": "Estado", "notas_producao": "Notas / guião"}
 
 SIN_PLATAFORMA = {"instagram": ["instagram", "insta", "ig"], "facebook": ["facebook", "fb", "face"], "tiktok": ["tiktok", "tik tok", "tt"],
                   "whatsapp": ["whatsapp", "whats", "wa", "estado whatsapp", "status"], "outro": ["outro", "outros"]}
-SIN_CATEGORIA = {"educativo": ["educativo", "educacao", "educacional", "dica", "dicas", "informativo"],
-                 "produto": ["produto", "produtos", "lancamento", "venda"],
-                 "bastidores": ["bastidores", "making of", "processo", "producao"],
-                 "testemunhos": ["testemunho", "testemunhos", "depoimento", "depoimentos", "review", "feedback"],
-                 "promocoes": ["promocao", "promocoes", "desconto", "oferta", "campanha"],
-                 "eventos": ["evento", "eventos", "feira", "live"]}
+SIN_CATEGORIA = {"educacao": ["educacao", "educativo", "educacional", "dica", "dicas", "informativo", "tutorial"],
+                 "autoridade": ["autoridade", "especialista", "ciencia", "ingredientes", "mitos", "curiosidades"],
+                 "branding": ["branding", "marca", "bastidores", "making of", "processo", "producao", "lifestyle", "evento", "eventos", "feira", "historia"],
+                 "prova_social": ["prova social", "testemunho", "testemunhos", "depoimento", "depoimentos", "review", "feedback", "antes e depois", "ugc"],
+                 "vendas": ["vendas", "venda", "produto", "produtos", "lancamento", "promocao", "promocoes", "desconto", "oferta", "campanha"]}
 SIN_FORMATO = {"post": ["post", "imagem", "foto", "estatico", "feed"], "carrossel": ["carrossel", "carousel", "carrosel"],
                "reel": ["reel", "reels", "video curto"], "story": ["story", "stories", "storie", "estado"],
                "video": ["video", "videos"], "live": ["live", "direto", "directo"], "outro": ["outro"]}
@@ -169,7 +168,7 @@ def _interpretar(db: Session, linha: list, mapa: dict[str, int], ano: int, padro
         bruto = val(campo)
         v = _sinonimo(bruto, tabela) or padroes.get(campo)
         if v is None:
-            erros.append(f"{ROTULOS[campo]} não reconhecida: «{bruto}»" if bruto else f"{ROTULOS[campo]} em falta")
+            erros.append(f"{ROTULOS[campo]}: valor não reconhecido «{bruto}»" if bruto else f"{ROTULOS[campo]} em falta")
         d[campo] = v
     texto = str(val("texto") or "").strip() or None
     tema = str(val("tema") or "").strip()

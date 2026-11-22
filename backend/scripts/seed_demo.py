@@ -282,22 +282,22 @@ def semear_marketing(db, maira, luisa):
     db.add(camp)
     db.flush()
     itens = [
-        (-6, "instagram", "educativo", "carrossel", "Como hidratar cabelos 4C/4D no calor", "publicado",
+        (-6, "instagram", "educacao", "carrossel", "Como hidratar cabelos 4C/4D no calor", "publicado",
          "Cabelos 4C e 4D pedem hidratação com calma e camadas. Guarda este passo a passo para o teu próximo dia de cuidado. 🌿",
          "#Lumara #Cabelos4C #CuidadoNatural #Luanda", "Guarda para não esquecer"),
-        (-2, "instagram", "bastidores", "reel", "Um dia na produção dos sabonetes artesanais", "aprovado",
+        (-2, "instagram", "branding", "reel", "Um dia na produção dos sabonetes artesanais", "aprovado",
          "Do corte ao embrulho: cada sabonete passa pelas nossas mãos. Vem ver como nasce o teu ritual.", "#Lumara #FeitoAMao #Angola", "Envia-nos mensagem para encomendar"),
-        (1, "instagram", "produto", "post", "Óleo fortalecedor de unhas — ritual de 2 minutos", "revisao",
+        (1, "instagram", "vendas", "post", "Óleo fortalecedor de unhas — ritual de 2 minutos", "revisao",
          "Um momento só teu: 2 minutos para cuidar das unhas antes de dormir. [preço] · encomendas por mensagem.", "#Lumara #Unhas #Autocuidado", "Encomenda por mensagem"),
-        (3, "facebook", "testemunhos", "post", "Testemunho de cliente sobre o óleo corporal", "criacao",
+        (3, "facebook", "prova_social", "post", "Testemunho de cliente sobre o óleo corporal", "criacao",
          "[testemunho real da cliente, com autorização] — [nome da cliente]", None, None),
-        (6, "whatsapp", "promocoes", "story", "Anúncio dos kits de festas", "planeamento", None, None, None),
-        (9, "instagram", "educativo", "reel", "Mãos e pés: rotina de cuidado semanal", "ideia", None, None, None),
+        (6, "whatsapp", "vendas", "story", "Anúncio dos kits de festas", "planeamento", None, None, None),
+        (9, "instagram", "educacao", "reel", "Mãos e pés: rotina de cuidado semanal", "ideia", None, None, None),
     ]
     for dias, plat, cat, fmt, tema, estado, texto, tags, cta in itens:
         c = Conteudo(data_publicacao=d + timedelta(days=dias), plataforma=plat, categoria=cat, formato=fmt, tema=f"[DEMO] {tema}",
                      texto=texto, hashtags=tags, cta=cta, estado=estado, responsavel_id=maira.id, criado_por_id=maira.id, is_demo=True,
-                     campanha_id=camp.id if cat == "promocoes" else None)
+                     campanha_id=camp.id if cat == "vendas" else None)
         if estado in ("aprovado", "publicado"):
             c.aprovado_em, c.aprovado_por_id, c.submetido_em = agora(), luisa.id, agora()
         if estado == "revisao":

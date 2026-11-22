@@ -336,3 +336,26 @@ def test_kits_escolha_na_venda(equipa):
     r = maira.post(f"{url}/devolucoes", {"itens": [{"artigo_id": kit["id"], "quantidade": "1", "repor_stock": True}], "motivo": "Oferta repetida"})
     assert r.status_code == 201, r.text
     assert (saldo(lav), saldo(mel), saldo(oleo)) == (10, 8, 9)
+
+
+def test_pilares_de_conteudo_e_aviso_de_mix(equipa):
+    from tests.test_marketing import _novo
+    luisa, maira, diana = equipa
+    d = hoje().replace(day=1) + timedelta(days=40)  # um mês futuro sem conteúdos
+    d = d.replace(day=1)
+    vazio = maira.get("/marketing/pilares", params={"ano": d.year, "mes": d.month}).json()
+    assert vazio["total"] == 0 and vazio["poucos_dados"] and not vazio["avisos"]
+    assert [p["alvo_pct"] for p in vazio["pilares"]] == [40, 20, 20, 10, 10]
+    # As antigas categorias já não são aceites.
+    r = maira.post("/marketing/conteudos", {"data_publicacao": d.isoformat(), "plataforma": "instagram", "categoria": "educativo",
+                                            "formato": "post", "tema": "Tema antigo"})
+    assert r.status_code in (400, 422)
+    for i, pilar in enumerate(["educacao"] * 5 + ["vendas"]):
+        _novo(maira, data_publicacao=(d + timedelta(days=i)).isoformat(), categoria=pilar, tema=f"Tema {i}")
+    m = maira.get("/marketing/pilares", params={"ano": d.year, "mes": d.month}).json()
+    educ = next(p for p in m["pilares"] if p["id"] == "educacao")
+    assert m["total"] == 6 and educ["pct"] == 83.3 and educ["desvio_pp"] == 43.3
+    assert any(a.startswith("Educação: 83,3%") and "acima" in a for a in m["avisos"])
+    assert any(a.startswith("Autoridade") and "abaixo" in a for a in m["avisos"])
+    assert not any(a.startswith("Vendas") for a in m["avisos"])  # 16,7% vs 10%: dentro da tolerância
+    assert diana.get("/marketing/pilares", params={"ano": d.year, "mes": d.month}).status_code == 403

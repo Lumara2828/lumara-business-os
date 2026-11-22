@@ -12,7 +12,7 @@ import { Carregando, Demo, Modal } from "./ui";
 const limpa = (s: string) => s.replace(/^\[DEMO\] /, "");
 type Form = { data_publicacao: string; hora_publicacao: string; plataforma: string; categoria: string; formato: string; tema: string;
   objectivo: string; texto: string; hashtags: string; cta: string; notas_producao: string; responsavel_id: string; campanha_id: string; ia_assistido: boolean };
-const vazio = (d?: string): Form => ({ data_publicacao: d ?? "", hora_publicacao: "", plataforma: "instagram", categoria: "educativo", formato: "post",
+const vazio = (d?: string): Form => ({ data_publicacao: d ?? "", hora_publicacao: "", plataforma: "instagram", categoria: "educacao", formato: "post",
   tema: "", objectivo: "", texto: "", hashtags: "", cta: "", notas_producao: "", responsavel_id: "", campanha_id: "", ia_assistido: false });
 
 export function EstadoConteudoBadge({ estado }: { estado: string }) {
@@ -134,7 +134,7 @@ export default function ConteudoDetalhe({ id, dataInicial, inicial, aoFechar, ao
                   {membros.dados?.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
                 <div><label className="rotulo">Plataforma</label><select className="campo" value={f.plataforma} onChange={(e) => m("plataforma", e.target.value)}>
                   {Object.entries(PLATAFORMAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-                <div><label className="rotulo">Categoria</label><select className="campo" value={f.categoria} onChange={(e) => m("categoria", e.target.value)}>
+                <div><label className="rotulo">Pilar</label><select className="campo" value={f.categoria} onChange={(e) => m("categoria", e.target.value)}>
                   {Object.entries(CATEGORIAS_CONTEUDO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
                 <div><label className="rotulo">Formato</label><select className="campo" value={f.formato} onChange={(e) => m("formato", e.target.value)}>
                   {Object.entries(FORMATOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>

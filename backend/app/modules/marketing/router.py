@@ -36,7 +36,7 @@ from app.modules.notificacoes.service import notificar, notificar_ceo
 router = APIRouter(prefix="/marketing", tags=["Marketing"])
 
 Plataforma = Literal["instagram", "facebook", "tiktok", "whatsapp", "outro"]
-Categoria = Literal["educativo", "produto", "bastidores", "testemunhos", "promocoes", "eventos"]
+Categoria = Literal["educacao", "autoridade", "branding", "prova_social", "vendas"]  # pilar de conteúdo
 Formato = Literal["post", "carrossel", "reel", "story", "video", "live", "outro"]
 Estado = Literal["ideia", "planeamento", "criacao", "revisao", "aprovado", "agendado", "publicado", "analisado"]
 
@@ -433,6 +433,38 @@ def remover_media(cid: UUID, mid: UUID, ctx: Contexto = Depends(requer(P.MARKETI
     db.commit()
 
 
+# --- Pilares de conteúdo (melhoria nº 11) ---------------------------------------
+
+MIN_PARA_AVISAR = 5  # com menos conteúdos no mês, as percentagens não dizem nada
+
+
+def mix_pilares(lista) -> dict:
+    """Compara a distribuição dos conteúdos pelos pilares com o mix-alvo e avisa quando se afasta."""
+    from app.modules.marketing.models import PILARES_ALVO, ROTULO_PILAR, TOLERANCIA_MIX_PP
+    total = len(lista)
+    pilares, avisos = [], []
+    for p, alvo in PILARES_ALVO.items():
+        n = sum(1 for c in lista if c.categoria == p)
+        pct = round(100 * n / total, 1) if total else None
+        desvio = round(pct - alvo, 1) if pct is not None else None
+        pilares.append({"id": p, "rotulo": ROTULO_PILAR[p], "conteudos": n, "pct": pct, "alvo_pct": alvo, "desvio_pp": desvio})
+        if total >= MIN_PARA_AVISAR and desvio is not None and abs(desvio) > TOLERANCIA_MIX_PP:
+            n_ = lambda x: f"{x:.1f}".removesuffix(".0").replace(".", ",")  # noqa: E731
+            avisos.append(f"{ROTULO_PILAR[p]}: {n_(pct)}% dos conteúdos, alvo {alvo}% "
+                          f"({'acima' if desvio > 0 else 'abaixo'} {n_(abs(desvio))} pontos).")
+    return {"total": total, "pilares": pilares, "avisos": avisos, "tolerancia_pp": TOLERANCIA_MIX_PP,
+            "poucos_dados": total < MIN_PARA_AVISAR}
+
+
+@router.get("/pilares")
+def pilares_mes(ano: int = Query(ge=2024, le=2100), mes: int = Query(ge=1, le=12),
+                ctx: Contexto = Depends(requer(P.MARKETING_CALENDARIO)), db: Session = Depends(get_db)):
+    de = date(ano, mes, 1)
+    ate = date(ano + (mes == 12), mes % 12 + 1, 1)
+    lista = db.scalars(select(Conteudo).where(Conteudo.data_publicacao >= de, Conteudo.data_publicacao < ate)).unique().all()
+    return mix_pilares(lista)
+
+
 # --- Desempenho -------------------------------------------------------------------
 
 @router.get("/desempenho")
@@ -469,7 +501,7 @@ def desempenho(de: date, ate: date, ctx: Contexto = Depends(requer(P.MARKETING_C
         "atrasados": sum(1 for c in lista if c.data_publicacao < hoje() and c.estado not in ("publicado", "analisado")),
         "sem_metricas": sum(1 for c in publicados if not c.metricas),
         "alcance_total": sum((c.metricas or {}).get("alcance", 0) or 0 for c in com_m),
-        "por_categoria": agrupar("categoria"), "por_plataforma": agrupar("plataforma"),
+        "por_categoria": agrupar("categoria"), "por_plataforma": agrupar("plataforma"), "mix_pilares": mix_pilares(lista),
         "melhores": [{"id": c.id, "codigo": codigo(c), "tema": c.tema, "plataforma": c.plataforma, "envolvimento_pct": _envolvimento(c.metricas),
                       "alcance": c.metricas.get("alcance")} for c in top],
         "ia_assistidos": sum(1 for c in lista if c.ia_assistido),

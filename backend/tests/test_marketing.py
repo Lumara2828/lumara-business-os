@@ -18,7 +18,7 @@ def _d(n=3):
 
 
 def _novo(p, **k):
-    corpo = {"data_publicacao": _d(), "plataforma": "instagram", "categoria": "educativo", "formato": "carrossel",
+    corpo = {"data_publicacao": _d(), "plataforma": "instagram", "categoria": "educacao", "formato": "carrossel",
              "tema": "Ritual de cuidado das unhas", **k}
     r = p.post("/marketing/conteudos", corpo)
     assert r.status_code == 201, r.text
@@ -171,9 +171,9 @@ def test_importacao_excel(equipa):
     res = r.json()
     assert res["criados"] == 3 and [i["linha"] for i in res["ignoradas"]] == [7]
     lista = {c["tema"]: c for c in maira.get("/marketing/conteudos", params={"de": "2026-12-01", "ate": "2026-12-31"}).json()}
-    assert lista["Como hidratar cabelos 4C"]["plataforma"] == "instagram" and lista["Como hidratar cabelos 4C"]["categoria"] == "educativo"
+    assert lista["Como hidratar cabelos 4C"]["plataforma"] == "instagram" and lista["Como hidratar cabelos 4C"]["categoria"] == "educacao"
     t = lista["Testemunho da cliente [nome]"]
-    assert t["estado"] == "revisao" and t["aprovado_em"] is None and t["categoria"] == "testemunhos"  # nunca entra aprovado
+    assert t["estado"] == "revisao" and t["aprovado_em"] is None and t["categoria"] == "prova_social"  # nunca entra aprovado
     assert lista["Kits de Natal"]["data_publicacao"] == "2026-12-05" and lista["Kits de Natal"]["estado"] == "criacao"
     assert all(c["origem"] == "importacao" for c in lista.values())
     r = maira.post("/marketing/importar/analisar", files={"ficheiro": ("x.csv", b"a,b", "text/csv")})
@@ -210,7 +210,7 @@ def test_desempenho_e_dashboard(equipa, db):
     maira.put(f"/marketing/conteudos/{a['id']}/metricas", {"alcance": 500, "gostos": 50})
     d = maira.get("/marketing/desempenho", params={"de": hoje().isoformat(), "ate": _d(30)}).json()
     assert d["planeados"] == 2 and d["publicados"] == 1 and d["em_revisao"] == 1 and d["alcance_total"] == 500
-    assert d["por_categoria"]["educativo"]["envolvimento_pct"] == 10.0
+    assert d["por_categoria"]["educacao"]["envolvimento_pct"] == 10.0
     exc = luisa.get("/excepcoes").json()["seccoes"]
     assert [x["tema"] for x in exc["conteudos_aprovacao"]] == ["Ritual de cuidado das unhas"]
     dash = luisa.get("/dashboard/executivo").json()

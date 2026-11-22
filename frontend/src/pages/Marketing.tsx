@@ -50,6 +50,7 @@ export default function Marketing() {
         </div>
       )}
       {conteudos.erro && <ErroCaixa texto={conteudos.erro} aoTentar={recarregar} />}
+      {aba === "calendario" && conteudos.dados && <MixDoMes mes={mes} versao={conteudos.dados} />}
       {aba === "calendario" && (!conteudos.dados ? <Carregando /> : <Calendario mes={mes} conteudos={conteudos.dados} aoAbrir={(id) => setAberto({ id })} aoCriar={(d) => setAberto({ id: null, data: d })} />)}
       {aba === "fluxo" && (!conteudos.dados ? <Carregando /> : <Fluxo conteudos={mergePendentes(conteudos.dados, pendentes.dados)} aoAbrir={(id) => setAberto({ id })} />)}
       {aba === "campanhas" && <Campanhas />}
@@ -59,7 +60,7 @@ export default function Marketing() {
           <p className="text-sm text-terra-700 mb-3">Peça temas para o mês, guiões ou ideias de campanha. «Usar» cria um conteúdo novo (em Ideia) com a sugestão, para a equipa trabalhar.</p>
           <AssistenteIA tipos={["temas", "campanha", "reel", "stories"]} contexto={{ periodo: `${MESES[mes.getMonth()]} ${mes.getFullYear()}` }}
             aoUsar={(tipo, p) => setAberto({ id: null, data: hojeIso(), inicial: tipo === "temas"
-              ? { tema: String(p.tema ?? ""), categoria: String(p.categoria ?? "educativo"), formato: String(p.formato ?? "post"), objectivo: String(p.objectivo ?? ""), notas_producao: String(p.descricao ?? "") }
+              ? { tema: String(p.tema ?? ""), categoria: String(p.categoria ?? "educacao"), formato: String(p.formato ?? "post"), objectivo: String(p.objectivo ?? ""), notas_producao: String(p.descricao ?? "") }
               : { tema: String(p.nome ?? p.titulo ?? "Ideia da IA"), notas_producao: JSON.stringify(p, null, 2) } })} />
         </Seccao>
       )}
@@ -67,6 +68,40 @@ export default function Marketing() {
       {aba === "marca" && <Marca />}
       {aba === "integracoes" && <Integracoes />}
       {aberto && <ConteudoDetalhe id={aberto.id} dataInicial={aberto.data} inicial={aberto.inicial} aoFechar={() => setAberto(null)} aoMudar={recarregar} />}
+    </div>
+  );
+}
+
+interface Mix { total: number; poucos_dados: boolean; tolerancia_pp: number; avisos: string[];
+  pilares: { id: string; rotulo: string; conteudos: number; pct: number | null; alvo_pct: number; desvio_pp: number | null }[] }
+
+/** Melhoria nº 11: distribuição dos conteúdos do mês pelos pilares, comparada com o mix-alvo. */
+function MixDoMes({ mes, versao }: { mes: Date; versao: unknown }) {
+  const { dados } = useDados(() => api.get<Mix>("/marketing/pilares", { ano: mes.getFullYear(), mes: mes.getMonth() + 1 }), [mes, versao]);
+  if (!dados || !dados.total) return null;
+  return <div className="cartao p-4"><h2 className="text-sm font-medium mb-2">Pilares de conteúdo em {MESES[mes.getMonth()].toLowerCase()}</h2><MixPilares mix={dados} /></div>;
+}
+
+function MixPilares({ mix }: { mix: Mix }) {
+  if (!mix.total) return <p className="text-sm text-terra-700">Sem conteúdos no período.</p>;
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-5">{mix.pilares.map((p) => {
+        const fora = !mix.poucos_dados && p.desvio_pp !== null && Math.abs(p.desvio_pp) > mix.tolerancia_pp;
+        return (
+          <div key={p.id} className="text-xs">
+            <div className="flex justify-between"><span className="font-medium">{p.rotulo}</span><span className={fora ? "text-red-700 font-medium" : "text-terra-700"}>{p.pct === null ? "—" : `${String(p.pct).replace(".", ",")}%`} / {p.alvo_pct}%</span></div>
+            <div className="relative mt-1 h-2 rounded-full bg-linho" role="img" aria-label={`${p.rotulo}: ${p.pct ?? 0}% dos conteúdos, alvo ${p.alvo_pct}%`}>
+              <div className="h-2 rounded-full" style={{ width: `${Math.min(p.pct ?? 0, 100)}%`, background: COR_CATEGORIA[p.id] }} />
+              <div className="absolute -top-0.5 h-3 w-0.5 bg-terra-700" style={{ left: `${p.alvo_pct}%` }} title={`Alvo ${p.alvo_pct}%`} />
+            </div>
+            <span className="text-terra-700">{p.conteudos} conteúdo(s)</span>
+          </div>);
+      })}</div>
+      {mix.avisos.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+        <p className="font-medium">O mix do mês afasta-se do alvo em mais de {mix.tolerancia_pp} pontos:</p>
+        <ul className="list-disc pl-4">{mix.avisos.map((a) => <li key={a}>{a}</li>)}</ul></div>}
+      {mix.poucos_dados && <p className="text-xs text-terra-700">Com menos de 5 conteúdos ainda não se compara com o alvo.</p>}
     </div>
   );
 }
@@ -138,7 +173,7 @@ function Fluxo({ conteudos, aoAbrir }: { conteudos: Conteudo[]; aoAbrir: (id: st
 }
 
 interface Desemp { planeados: number; publicados: number; execucao_pct: number | null; em_revisao: number; atrasados: number; sem_metricas: number;
-  alcance_total: number; ia_assistidos: number; por_categoria: Record<string, Grupo>; por_plataforma: Record<string, Grupo>;
+  alcance_total: number; ia_assistidos: number; por_categoria: Record<string, Grupo>; por_plataforma: Record<string, Grupo>; mix_pilares: Mix;
   melhores: { id: string; codigo: string; tema: string; plataforma: string; envolvimento_pct: number; alcance: number }[] }
 interface Grupo { planeados: number; publicados: number; alcance: number; interaccoes: number; com_metricas: number; envolvimento_pct: number | null }
 
@@ -163,8 +198,9 @@ function Desempenho() {
             <Kpi titulo="Em revisão" valor={d.em_revisao} tom={d.em_revisao ? "aviso" : "bom"} />
             <Kpi titulo="Atrasados" valor={d.atrasados} tom={d.atrasados ? "alerta" : "bom"} detalhe={`${d.ia_assistidos} assistido(s) por IA`} />
           </div>
+          <Seccao titulo="Mix de pilares no período"><MixPilares mix={d.mix_pilares} /></Seccao>
           <div className="grid lg:grid-cols-2 gap-4">
-            <Seccao titulo="Por categoria">{tabela(d.por_categoria, CATEGORIAS_CONTEUDO)}</Seccao>
+            <Seccao titulo="Por pilar">{tabela(d.por_categoria, CATEGORIAS_CONTEUDO)}</Seccao>
             <Seccao titulo="Por plataforma">{tabela(d.por_plataforma, PLATAFORMAS)}</Seccao>
           </div>
           <Seccao titulo="Conteúdos com maior envolvimento">
@@ -304,7 +340,7 @@ function Importar({ aoImportar }: { aoImportar: () => void }) {
           </Seccao>
           <Seccao titulo="3. Pré-visualização (primeiras 15 linhas)">
             <div className="overflow-x-auto"><table className="w-full text-xs min-w-[720px] [&_td]:pr-3 [&_th]:pr-3">
-              <thead className="text-terra-700"><tr><th className="text-left">Linha</th><th className="text-left">Data</th><th className="text-left">Plataforma</th><th className="text-left">Categoria</th><th className="text-left">Formato</th><th className="text-left">Tema</th><th className="text-left">Estado</th><th className="text-left">Problemas</th></tr></thead>
+              <thead className="text-terra-700"><tr><th className="text-left">Linha</th><th className="text-left">Data</th><th className="text-left">Plataforma</th><th className="text-left">Pilar</th><th className="text-left">Formato</th><th className="text-left">Tema</th><th className="text-left">Estado</th><th className="text-left">Problemas</th></tr></thead>
               <tbody className="divide-y divide-linho/60">{a.previsualizacao.map((p) => (
                 <tr key={p.linha} className={p.erros.length ? "bg-red-50/60" : ""}><td className="py-1">{p.linha}</td><td>{fData(p.valores.data_publicacao)}</td><td>{p.valores.plataforma ?? "—"}</td>
                   <td>{p.valores.categoria ?? "—"}</td><td>{p.valores.formato ?? "—"}</td><td className="max-w-52 truncate">{p.valores.tema}</td><td>{p.valores.estado}</td>

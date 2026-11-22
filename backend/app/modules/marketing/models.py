@@ -13,7 +13,11 @@ from app.core.database import Base
 from app.core.tipos import actualizado_em, criado_em, enum_texto, pk_uuid
 
 PLATAFORMAS = ("instagram", "facebook", "tiktok", "whatsapp", "outro")
-CATEGORIAS = ("educativo", "produto", "bastidores", "testemunhos", "promocoes", "eventos")
+# Melhoria nº 11: pilares de conteúdo (substituem as antigas categorias) e o mix-alvo mensal, em % dos conteúdos.
+CATEGORIAS = ("educacao", "autoridade", "branding", "prova_social", "vendas")
+PILARES_ALVO = {"educacao": 40, "autoridade": 20, "branding": 20, "prova_social": 10, "vendas": 10}
+ROTULO_PILAR = {"educacao": "Educação", "autoridade": "Autoridade", "branding": "Branding", "prova_social": "Prova social", "vendas": "Vendas"}
+TOLERANCIA_MIX_PP = 10  # desvio (pontos percentuais) a partir do qual o sistema avisa
 FORMATOS = ("post", "carrossel", "reel", "story", "video", "live", "outro")
 # IDEIA → PLANEAMENTO → CRIAÇÃO → REVISÃO → APROVAÇÃO → AGENDAMENTO → PUBLICAÇÃO → ANÁLISE
 ESTADOS = ("ideia", "planeamento", "criacao", "revisao", "aprovado", "agendado", "publicado", "analisado")

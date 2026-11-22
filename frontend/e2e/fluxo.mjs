@@ -399,6 +399,11 @@ await diana.waitForSelector("text=Compra importada em euros");
 await foto(diana, "42-entrada-importacao");
 await diana.keyboard.press("Escape");
 
+// --- Melhoria nº 11: pilares de conteúdo ---
+await maira.goto(`${BASE}/marketing`);
+await maira.waitForSelector("text=Pilares de conteúdo em");
+await foto(maira, "43-pilares-calendario");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

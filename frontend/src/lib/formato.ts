@@ -126,8 +126,9 @@ export function fQtd(v: string | number | null | undefined, unidade?: string): s
 }
 
 export const PLATAFORMAS: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", whatsapp: "WhatsApp", outro: "Outro" };
-export const CATEGORIAS_CONTEUDO: Record<string, string> = { educativo: "Educativo", produto: "Produto", bastidores: "Bastidores",
-  testemunhos: "Testemunhos", promocoes: "Promoções", eventos: "Eventos" };
+/** Melhoria nº 11: pilares de conteúdo (substituem as antigas categorias). */
+export const CATEGORIAS_CONTEUDO: Record<string, string> = { educacao: "Educação", autoridade: "Autoridade", branding: "Branding",
+  prova_social: "Prova social", vendas: "Vendas" };
 export const FORMATOS: Record<string, string> = { post: "Post", carrossel: "Carrossel", reel: "Reel", story: "Story", video: "Vídeo", live: "Live", outro: "Outro" };
 export const ESTADOS_CONTEUDO: { valor: string; rotulo: string; classe: string }[] = [
   { valor: "ideia", rotulo: "Ideia", classe: "bg-areia text-terra-700" },
@@ -139,8 +140,8 @@ export const ESTADOS_CONTEUDO: { valor: string; rotulo: string; classe: string }
   { valor: "publicado", rotulo: "Publicado", classe: "bg-folha-600 text-white" },
   { valor: "analisado", rotulo: "Analisado", classe: "bg-cacau/80 text-white" },
 ];
-export const COR_CATEGORIA: Record<string, string> = { educativo: "#5e7153", produto: "#9c6644", bastidores: "#8c7b6b",
-  testemunhos: "#b08968", promocoes: "#c08a2e", eventos: "#47573f" };
+export const COR_CATEGORIA: Record<string, string> = { educacao: "#006633", autoridade: "#2f6f8f", branding: "#8c5a9e",
+  prova_social: "#b08968", vendas: "#c08a2e" };
 
 export const CANAIS: Record<string, string> = { whatsapp: "WhatsApp", instagram: "Instagram", facebook: "Facebook", loja: "Loja / balcão",
   feira: "Feira / evento", telefone: "Telefone", outro: "Outro" };
