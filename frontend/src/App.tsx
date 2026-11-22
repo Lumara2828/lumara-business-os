@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import { Carregando } from "./components/ui";
 import Assistente from "./pages/Assistente";
 import Auditoria from "./pages/Auditoria";
+import Ausencias from "./pages/Ausencias";
 import Automacoes from "./pages/Automacoes";
 import Definicoes from "./pages/Definicoes";
 import Equipa from "./pages/Equipa";
@@ -12,6 +13,7 @@ import Excepcoes from "./pages/Excepcoes";
 import Financas from "./pages/Financas";
 import Login from "./pages/Login";
 import Marketing from "./pages/Marketing";
+import MinhaFuncao from "./pages/MinhaFuncao";
 import Notificacoes from "./pages/Notificacoes";
 import Ocorrencias from "./pages/Ocorrencias";
 import Painel from "./pages/Painel";
@@ -54,6 +56,8 @@ export default function App() {
         <Route path="auditoria" element={<Protegida permissao="auditoria.ver"><Auditoria /></Protegida>} />
         <Route path="definicoes" element={<Definicoes />} />
         <Route path="assistente" element={<Assistente />} />
+        <Route path="a-minha-funcao" element={<MinhaFuncao />} />
+        <Route path="ausencias" element={<Ausencias />} />
         <Route path="relatorio" element={<Protegida permissao="financas.ver"><RelatorioMensal /></Protegida>} />
         <Route path="automacoes" element={<Protegida permissao="configuracao.gerir"><Automacoes /></Protegida>} />
         <Route path="*" element={<Navigate to="/" replace />} />

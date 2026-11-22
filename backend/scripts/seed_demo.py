@@ -67,6 +67,9 @@ def limpar(db):
     db.execute(delete(ActividadeRecorrente).where(ActividadeRecorrente.is_demo.is_(True)))
     db.execute(delete(RegraDecisao).where(RegraDecisao.is_demo.is_(True)))
     if demo_ids:
+        ids = ",".join(f"'{i}'" for i in demo_ids)
+        db.execute(text(f"DELETE FROM descricoes_funcao WHERE utilizador_id IN ({ids})"))
+        db.execute(text(f"DELETE FROM ausencias WHERE utilizador_id IN ({ids}) OR substituta_id IN ({ids})"))
         db.execute(delete(Notificacao).where(Notificacao.utilizador_id.in_(demo_ids)))
         db.execute(delete(Sessao).where(Sessao.utilizador_id.in_(demo_ids)))
         # Utilizadoras DEMO com histórico de auditoria ficam desactivadas (o histórico é imutável).
@@ -88,6 +91,7 @@ def semear(db):
         luisa = db.scalar(select(Utilizador).where(Utilizador.email == "luisa@demo.lumara.ao"))
         if diana and luisa:
             semear_instrucoes(db, diana, luisa)
+            semear_funcoes(db)
             db.commit()
         print("Os dados DEMO já existem. Use --limpar para os remover primeiro.")
         return
@@ -387,6 +391,7 @@ def semear_financas_procedimentos(db, maira, diana, luisa):
                             etapas=[{"descricao": e} for e in etapas], checklist=check, estado="aprovado", criado_por_id=luisa.id,
                             aprovado_por_id=luisa.id, aprovado_em=agora(), is_demo=True))
     semear_instrucoes(db, diana, luisa)
+    semear_funcoes(db)
     cat = db.scalar(select(CategoriaFinanceira).where(CategoriaFinanceira.nome == "Embalagens e rótulos"))
     if cat:
         db.add(Lancamento(tipo="despesa", categoria_id=cat.id, descricao="[DEMO] Frascos âmbar de 30 ml (valor fictício)", valor_kz=D("10000"),
@@ -435,6 +440,64 @@ def semear_instrucoes(db, diana, luisa):
         db.add(t)
         db.flush()
         o.tarefa_id = t.id
+    db.flush()
+
+
+# Rascunho das funções preparado com a Luísa (separador «Funções» do manual). Fica em rascunho até a CEO aprovar.
+FUNCOES_RASCUNHO = {
+    "luisa@demo.lumara.ao": {
+        "titulo": "CEO e fundadora",
+        "missao": "Definir a direcção da Lumara e garantir que a empresa funciona por processos, intervindo só nas excepções.",
+        "responsabilidades": ["Planear a semana à segunda-feira e rever os resultados à sexta-feira",
+                              "Atribuir tarefas e definir prioridades, responsáveis e prazos",
+                              "Aprovar trabalhos, conteúdos antes de publicar, procedimentos, campanhas, fichas técnicas e rótulos",
+                              "Definir preços, metas, orçamento e margens; aprovar despesas e descontos acima do limite",
+                              "Acompanhar finanças, rentabilidade e o relatório mensal",
+                              "Gerir a equipa: contas, funções e acessos"],
+        "decide_sozinha": ["Preços, despesas, descontos acima de 10%, publicação de conteúdos, procedimentos, contratações e acessos"],
+        "decide_e_informa": [], "precisa_aprovacao": [],
+        "indicadores": ["Cumprimento de prazos da equipa", "Facturação e resultado do mês", "Excepções por resolver"]},
+    "maira@demo.lumara.ao": {
+        "titulo": "Marketing e vendas",
+        "missao": "Dar a conhecer a Lumara a quem valoriza cosmética natural artesanal e transformar esse interesse em clientes fiéis, mantendo a imagem premium da marca.",
+        "responsabilidades": ["Planear o calendário editorial e criar os conteúdos, submetendo-os à aprovação da Luísa",
+                              "Publicar só o que foi aprovado, registar as métricas e responder a comentários e mensagens no horário de trabalho",
+                              "Propor campanhas com objectivo, público, canais e datas, sem inventar descontos ou preços",
+                              "Registar encomendas e pagamentos e manter as fichas de clientes, com consentimento para marketing",
+                              "Preparar eventos e feiras e registar as vendas e os contactos",
+                              "Acompanhar os pagamentos por receber e avisar a Luísa dos atrasos"],
+        "decide_sozinha": ["Ordem das tarefas do dia", "Respostas a clientes", "Horário de publicação de um conteúdo aprovado", "Ideias e rascunhos de conteúdo"],
+        "decide_e_informa": ["Desconto até 10%", "Troca de data de um conteúdo aprovado dentro da mesma semana"],
+        "precisa_aprovacao": ["Publicar qualquer conteúdo", "Campanhas", "Desconto acima de 10%", "Despesas", "Preços", "Parcerias e colaborações pagas"],
+        "indicadores": ["Conteúdos publicados face aos planeados", "Envolvimento médio por publicação", "Novos seguidores",
+                        "Encomendas por mês", "Clientes novas e recorrentes", "Pagamentos por receber com mais de 7 dias"]},
+    "diana@demo.lumara.ao": {
+        "titulo": "Produção e stock",
+        "missao": "Produzir as bases e os seus derivados (ex.: base glicerinada e sabonetes) com qualidade constante, seguindo as receitas e as regras de segurança e higiene, e garantir que nunca falta matéria-prima nem produto para as encomendas.",
+        "responsabilidades": ["Produzir as bases e os seus derivados, como os sabonetes, seguindo a ficha técnica e o procedimento",
+                              "Cumprir e fazer cumprir as regras de segurança e higiene, em conjunto com a Eloísa",
+                              "Registar as não conformidades com a acção correctiva e avisar a Luísa das graves",
+                              "Registar entradas, saídas e perdas, fazer o inventário e vigiar o stock mínimo e as validades",
+                              "Pedir as matérias-primas e embalagens em falta, propondo a despesa à Luísa",
+                              "Embalar e preparar as encomendas e marcá-las como prontas",
+                              "Manter actualizadas as fichas técnicas das bases e derivados"],
+        "decide_sozinha": ["Ordem das tarefas do dia", "Que lote de matéria-prima usar (o que expira primeiro)",
+                           "Registo de perdas com motivo", "Ajuste de inventário após contagem"],
+        "decide_e_informa": ["Adiar uma produção por falta de material", "Rejeitar um lote com não conformidade"],
+        "precisa_aprovacao": ["Compras e despesas", "Novas receitas ou alterações de fórmula", "Produtos novos", "Fornecedores novos"],
+        "indicadores": ["Ordens concluídas no prazo", "Quantidade produzida face à planeada", "Perdas de stock",
+                        "Não conformidades", "Rupturas de stock", "Encomendas prontas no prazo"]},
+}
+
+
+def semear_funcoes(db):
+    """Melhoria nº 20 — descrições de função em rascunho para as contas DEMO. Idempotente."""
+    from app.modules.funcoes.models import DescricaoFuncao
+    luisa = db.scalar(select(Utilizador).where(Utilizador.email == "luisa@demo.lumara.ao"))
+    for email, conteudo in FUNCOES_RASCUNHO.items():
+        u = db.scalar(select(Utilizador).where(Utilizador.email == email))
+        if u is not None and luisa is not None and db.get(DescricaoFuncao, u.id) is None:
+            db.add(DescricaoFuncao(utilizador_id=u.id, conteudo=conteudo, estado="rascunho", actualizada_por_id=luisa.id))
     db.flush()
 
 

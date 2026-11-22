@@ -84,7 +84,7 @@ def logout(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_d
 
 @router.get("/me", response_model=Perfil)
 def eu(ctx: Contexto = Depends(contexto_actual)):
-    return Perfil.de(ctx.utilizador)
+    return Perfil.de(ctx.utilizador, ctx.extra)
 
 
 @router.post("/mudar-password", status_code=204)

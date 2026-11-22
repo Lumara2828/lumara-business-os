@@ -94,3 +94,89 @@ def test_tarefa_sem_procedimento_nao_exige_nada(equipa):
     i = maira.get(f"/tarefas/{t['id']}/instrucoes").json()
     assert i["procedimento"] is None and i["seguranca"] == [] and not i["exige_leitura"] and i["producao"] is None
     assert maira.post(f"/tarefas/{t['id']}/estado", {"estado": "concluida"}).json()["estado"] == "concluida"
+
+
+# --- nº 1: ausências e substituições --------------------------------------------
+
+def test_ausencia_pedida_aprovada_transfere_e_devolve(equipa, db, monkeypatch):
+    from app.modules.ausencias import service as aus
+    luisa, maira, diana = equipa
+    d = hoje()
+    em = lambda n: (d + timedelta(days=n)).isoformat()  # noqa: E731
+    t1 = luisa.post("/tarefas", {"titulo": "Contar frascos", "responsavel_id": diana.id, "prazo": em(1)}).json()
+    t2 = luisa.post("/tarefas", {"titulo": "Encomendar rótulos", "responsavel_id": diana.id, "prazo": em(20)}).json()
+
+    # A Diana pede; nada muda até a CEO aprovar.
+    a = diana.post("/ausencias", {"inicio": em(0), "fim": em(3), "motivo": "doenca", "substituta_id": maira.id,
+                                  "herdar_permissoes": True}).json()
+    assert a["estado"] == "pedida" and a["herdar_permissoes"] is False  # só a CEO decide isso
+    assert diana.get(f"/tarefas/{t1['id']}").json()["responsavel"]["id"] == diana.id
+    assert diana.post(f"/ausencias/{a['id']}/aprovar", {}).status_code == 403
+    assert maira.post("/stock/movimentos/entrada", {"artigo_id": "00000000-0000-0000-0000-000000000000", "quantidade": "1"}).status_code == 403
+
+    r = luisa.post(f"/ausencias/{a['id']}/aprovar", {"herdar_permissoes": True}).json()
+    assert r["estado"] == "aprovada" and r["em_curso"]
+    # Tarefa com prazo dentro da ausência passa para a Maira; a de prazo depois do regresso fica.
+    assert maira.get(f"/tarefas/{t1['id']}").json()["responsavel"]["id"] == maira.id
+    assert luisa.get(f"/tarefas/{t2['id']}").json()["responsavel"]["id"] == diana.id
+    # Permissões temporárias da Produção, sem as financeiras.
+    perfil = maira.get("/auth/me").json()["permissoes"]
+    assert "stock.movimentar" in perfil and "producao.ordens" in perfil and "financas.ver" not in perfil
+    # Tarefas novas para a ausente vão para a substituta; notificações são copiadas.
+    t3 = luisa.post("/tarefas", {"titulo": "Limpar bancada", "responsavel_id": diana.id, "prazo": em(2)}).json()
+    assert t3["responsavel"]["id"] == maira.id
+    from app.modules.notificacoes.service import notificar
+    notificar(db, diana.id, "teste", "Aviso para a Diana")
+    db.commit()
+    assert any(n["titulo"] == "[Diana] Aviso para a Diana" for n in maira.get("/notificacoes").json()["itens"])
+
+    # Regresso: a Maira concluiu uma; a outra volta à Diana. As permissões extra acabam.
+    maira.post(f"/tarefas/{t3['id']}/estado", {"estado": "concluida"})
+    monkeypatch.setattr(aus, "hoje", lambda: d + timedelta(days=4))
+    assert aus.processar(db)["tarefas_devolvidas"] == 1
+    assert luisa.get(f"/tarefas/{t1['id']}").json()["responsavel"]["id"] == diana.id
+    assert luisa.get(f"/tarefas/{t3['id']}").json()["responsavel"]["id"] == maira.id
+    assert aus.processar(db)["tarefas_devolvidas"] == 0  # idempotente
+
+
+def test_ausencia_regras(equipa):
+    luisa, maira, diana = equipa
+    d = hoje()
+    em = lambda n: (d + timedelta(days=n)).isoformat()  # noqa: E731
+    assert maira.post("/ausencias", {"utilizador_id": diana.id, "inicio": em(1), "fim": em(2), "motivo": "ferias"}).status_code == 403
+    assert maira.post("/ausencias", {"inicio": em(-3), "fim": em(2), "motivo": "ferias"}).json()["codigo"] == "data_invalida"
+    assert maira.post("/ausencias", {"inicio": em(3), "fim": em(1), "motivo": "ferias"}).status_code == 400
+    a = maira.post("/ausencias", {"inicio": em(5), "fim": em(9), "motivo": "ferias"}).json()
+    assert maira.post("/ausencias", {"inicio": em(8), "fim": em(12), "motivo": "ferias"}).json()["codigo"] == "sobreposicao"
+    assert luisa.post(f"/ausencias/{a['id']}/rejeitar", {}).json()["codigo"] == "motivo_obrigatorio"
+    assert luisa.post(f"/ausencias/{a['id']}/rejeitar", {"comentario": "Semana de feira"}).json()["estado"] == "rejeitada"
+    # CEO regista directamente (já aprovada); a CEO ausente não transfere permissões.
+    c = luisa.post("/ausencias", {"inicio": em(0), "fim": em(1), "motivo": "formacao", "substituta_id": maira.id,
+                                  "herdar_permissoes": True}).json()
+    assert c["estado"] == "aprovada"
+    assert "financas.ver" not in maira.get("/auth/me").json()["permissoes"]
+    assert "tarefas.aprovar" not in maira.get("/auth/me").json()["permissoes"]
+    # Regresso antecipado
+    assert luisa.post(f"/ausencias/{c['id']}/cancelar").json()["estado"] == "cancelada"
+    lst = diana.get("/ausencias").json()
+    assert lst["itens"] == [] and lst["ausentes_hoje"] == []
+
+
+# --- nº 20: a minha função --------------------------------------------------------
+
+def test_a_minha_funcao(equipa):
+    luisa, maira, diana = equipa
+    p = diana.get("/funcoes/minha").json()
+    assert p["pessoa"]["funcao_rotulo"] == "Produção" and p["descricao"] is None
+    assert "Registar entradas, saídas, perdas e inventários" in p["sistema"]["pode"]
+    assert "Ver finanças, custos e margens" in p["sistema"]["nao_pode"]
+    corpo = {"titulo": "Produção e stock", "missao": "Produzir as bases com qualidade.", "responsabilidades": ["Produzir", " "],
+             "decide_sozinha": ["Ordem do dia"], "decide_e_informa": [], "precisa_aprovacao": ["Compras"], "indicadores": []}
+    assert diana.put(f"/funcoes/{diana.id}", corpo).status_code == 403
+    assert maira.get(f"/funcoes/{diana.id}").status_code == 403
+    r = luisa.put(f"/funcoes/{diana.id}", corpo).json()
+    assert r["descricao"]["estado"] == "rascunho" and r["descricao"]["responsabilidades"] == ["Produzir"]
+    assert diana.get("/funcoes/minha").json()["descricao_em_preparacao"] is True  # rascunho não aparece à pessoa
+    luisa.post(f"/funcoes/{diana.id}/aprovar")
+    assert diana.get("/funcoes/minha").json()["descricao"]["missao"] == "Produzir as bases com qualidade."
+    assert {x["nome"]: x["estado"] for x in luisa.get("/funcoes").json()}["Diana"] == "aprovada"

@@ -27,9 +27,11 @@ class Contexto:
     utilizador: Utilizador
     sessao: Sessao
     ip: str | None
+    # Permissões temporárias de quem substitui alguém ausente (melhoria nº 1), autorizadas pela CEO.
+    extra: frozenset = frozenset()
 
     def pode(self, permissao: P) -> bool:
-        return tem_permissao(self.utilizador.funcao, permissao)
+        return tem_permissao(self.utilizador.funcao, permissao) or permissao in self.extra
 
 
 def contexto_actual(
@@ -55,7 +57,8 @@ def contexto_actual(
         sessao.ultima_actividade_em = momento
         db.commit()
     ip = request.client.host if request.client else None
-    return Contexto(utilizador=utilizador, sessao=sessao, ip=ip)
+    from app.modules.ausencias.service import permissoes_extra
+    return Contexto(utilizador=utilizador, sessao=sessao, ip=ip, extra=permissoes_extra(db, utilizador.id))
 
 
 def requer(*permissoes: P):

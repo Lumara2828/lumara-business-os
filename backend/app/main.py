@@ -19,6 +19,8 @@ from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.modules.assistente.router import router as assistente
 from app.modules.auditoria.router import router as auditoria
+from app.modules.ausencias.router import router as ausencias
+from app.modules.funcoes.router import router as funcoes
 from app.modules.automacao.router import router as automacoes
 from app.modules.auth.router import router as auth
 from app.modules.configuracao.router import router as configuracao
@@ -60,7 +62,7 @@ async def cabecalhos_seguranca(request: Request, call_next):
 
 
 for r in (auth, equipa, tarefas, notificacoes, ocorrencias, responsabilidades, rotina, dashboard, auditoria, configuracao,
-          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos, assistente, relatorios, automacoes):
+          stock, producao, marketing, ia, integracoes, vendas, eventos, financas, procedimentos, assistente, relatorios, automacoes, ausencias, funcoes):
     app.include_router(r)
 
 

@@ -35,10 +35,17 @@ HORA_RESUMO = 7
 _CHAVE_ESTADO = "_automacoes"
 _TRAVA = 742_006  # pg_advisory_lock: uma só execução de cada vez, mesmo com vários processos
 
+def ausencias(db: Session) -> dict:
+    from app.modules.ausencias.service import processar
+    return processar(db)
+
+
 AUTOMACOES = {
     "alertas": {"nome": "Alertas operacionais", "descricao": "Tarefas em atraso, aprovações paradas, stock abaixo do mínimo, "
                 "validades, conteúdos sem aprovação, encomendas atrasadas e cobranças. De 15 em 15 minutos, no máximo.",
                 "configuravel": None},
+    "ausencias": {"nome": "Ausências e substituições", "descricao": "No início de cada ausência aprovada, as tarefas passam "
+                  "para a substituta; no regresso, as que ficaram por concluir voltam à pessoa original.", "configuravel": None},
     "resumo_semanal": {"nome": "Resumo semanal", "descricao": "À segunda-feira a partir das 07:00: cada pessoa recebe o resumo da sua "
                        "semana (atrasos, prazos, aprovações); a CEO recebe também o da equipa.", "configuravel": "automacao_resumo_semanal"},
     "relatorio_mensal": {"nome": "Relatório mensal da CEO", "descricao": "No início de cada mês, a CEO é avisada de que o relatório do "
@@ -137,7 +144,7 @@ def executar(db: Session, forcar: bool = False) -> dict:
 def _executar(db: Session, forcar: bool) -> dict:
     feitos = {}
     for nome, fn in (("alertas", alertas.verificar if forcar else _alertas_se_necessario),
-                     ("resumo_semanal", resumo_semanal), ("relatorio_mensal", relatorio_mensal)):
+                     ("ausencias", ausencias), ("resumo_semanal", resumo_semanal), ("relatorio_mensal", relatorio_mensal)):
         if not _activa(db, nome):
             continue
         try:

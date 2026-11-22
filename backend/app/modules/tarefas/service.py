@@ -198,10 +198,13 @@ def criar(db: Session, ctx: Contexto, dados: TarefaCriar) -> Tarefa:
     t = Tarefa(**dados.model_dump(exclude={"responsavel_id"}), responsavel_id=responsavel_id, criado_por_id=eu.id)
     db.add(t)
     db.flush()
+    from app.modules.ausencias.service import encaminhar_tarefa
+    encaminhar_tarefa(db, t, eu.id)  # responsável ausente → vai para a substituta
+    db.flush()
     db.refresh(t)
     registar(db, utilizador_id=eu.id, accao="criar", entidade="tarefa", entidade_id=t.id,
              resumo=f"Criou {codigo(t)} «{t.titulo}» para {responsavel.nome} (prazo {formatar_data(t.prazo)})", ip=ctx.ip)
-    notificar(db, responsavel_id, "tarefa_atribuida", f"Nova tarefa: {t.titulo}",
+    notificar(db, t.responsavel_id, "tarefa_atribuida", f"Nova tarefa: {t.titulo}",
               f"{eu.nome} atribuiu-lhe {codigo(t)} com prazo {formatar_data(t.prazo)}.", ligacao(t), excepto=eu.id)
     db.commit()
     return t
@@ -238,6 +241,10 @@ def actualizar(db: Session, ctx: Contexto, t: Tarefa, dados: TarefaActualizar) -
     responsavel_anterior = t.responsavel_id
     for k, v in alteracoes.items():
         setattr(t, k, v)
+    if "responsavel_id" in alteracoes:
+        from app.modules.ausencias.service import encaminhar_tarefa
+        db.flush()
+        encaminhar_tarefa(db, t, ctx.utilizador.id)
     mudancas = diferencas(antes, alteracoes)
     if not mudancas:
         return t

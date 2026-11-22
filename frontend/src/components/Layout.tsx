@@ -26,6 +26,8 @@ const ICONES: Record<string, string> = {
   assistente: "M4 5h16v11H9l-5 4zM8 9h8M8 12h5",
   relatorio: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h3",
   automacoes: "M13 3L5 13h6l-1 8 8-10h-6z",
+  funcao: "M12 11a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 4-7 8-7s8 3 8 7M16 15l2 2 4-4",
+  ausencias: "M4 5h16v15H4zM4 9h16M8 3v4M16 3v4M9 14l6 0",
 };
 
 function Icone({ nome }: { nome: string }) {
@@ -58,6 +60,8 @@ export default function Layout() {
     { a: "/procedimentos", n: "Procedimentos", i: "procedimentos" },
     { a: "/ocorrencias", n: "Ocorrências", i: "ocorrencias" },
     { a: "/responsabilidades", n: "Responsabilidades", i: "responsabilidades" },
+    { a: "/a-minha-funcao", n: pode("equipa.gerir") ? "Funções da equipa" : "A minha função", i: "funcao" },
+    { a: "/ausencias", n: "Ausências", i: "ausencias" },
     { a: "/notificacoes", n: "Notificações", i: "notificacoes" },
   ].filter(Boolean) as { a: string; n: string; i: string }[];
   const gestao = [

@@ -16,3 +16,5 @@ from app.modules.vendas.models import Cliente, Encomenda, LinhaEncomenda, Pagame
 from app.modules.financas.models import CategoriaFinanceira, DespesaFixa, Lancamento, Orcamento  # noqa: F401,E402
 from app.modules.procedimentos.models import ExecucaoProcedimento, Procedimento  # noqa: F401,E402
 from app.modules.vendas.models import Devolucao  # noqa: F401,E402
+from app.modules.ausencias.models import Ausencia, TransferenciaTarefa  # noqa: F401,E402
+from app.modules.funcoes.models import DescricaoFuncao  # noqa: F401,E402

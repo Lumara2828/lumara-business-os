@@ -164,7 +164,7 @@ def test_aviso_relatorio_mensal(equipa, db, monkeypatch):
 def test_automacoes_pagina_e_configuracao(equipa):
     luisa, maira, _ = equipa
     lista = luisa.get("/automacoes").json()
-    assert [a["id"] for a in lista] == ["alertas", "resumo_semanal", "relatorio_mensal"] and all(a["activa"] for a in lista)
+    assert [a["id"] for a in lista] == ["alertas", "ausencias", "resumo_semanal", "relatorio_mensal"] and all(a["activa"] for a in lista)
     assert maira.get("/automacoes").status_code == 403
     assert maira.post("/automacoes/executar").status_code == 403
     r = luisa.post("/automacoes/executar").json()

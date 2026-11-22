@@ -28,9 +28,10 @@ class Perfil(UtilizadorOut):
     deve_mudar_password: bool
 
     @classmethod
-    def de(cls, u) -> "Perfil":
+    def de(cls, u, extra=frozenset()) -> "Perfil":
         base = UtilizadorOut.model_validate(u).model_dump()
-        return cls(**base, funcao_rotulo=ROTULOS_FUNCAO[Funcao(u.funcao)], permissoes=permissoes_de(u.funcao),
+        permissoes = sorted(set(permissoes_de(u.funcao)) | {p.value for p in extra})
+        return cls(**base, funcao_rotulo=ROTULOS_FUNCAO[Funcao(u.funcao)], permissoes=permissoes,
                    deve_mudar_password=u.deve_mudar_password)
 
 

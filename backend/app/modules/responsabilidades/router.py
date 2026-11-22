@@ -189,6 +189,8 @@ def gerar_tarefas_semana(dados: GerarIn, ctx: Contexto = Depends(requer(P.ROTINA
     registar(db, utilizador_id=ctx.utilizador.id, accao="gerar_tarefas", entidade="rotina", entidade_id=segunda.isoformat(),
              resumo=f"Gerou {len(criadas)} tarefa(s) recorrente(s) para a semana de {formatar_data(segunda)}", ip=ctx.ip)
     db.commit()
+    from app.modules.ausencias.service import processar
+    processar(db, ctx.utilizador.id)  # tarefas de quem está ausente passam para a substituta
     return {"semana_inicio": segunda, "criadas": len(criadas), "ja_existentes": existentes}
 
 

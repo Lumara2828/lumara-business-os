@@ -326,6 +326,40 @@ await luisa.waitForSelector("text=Automações executadas.");
 await foto(luisa, "31-automacoes");
 assert.equal(await maira.goto(`${BASE}/relatorio`).then(() => maira.locator("text=Destaques").count()), 0, "Maira não vê o relatório mensal");
 
+// --- Melhoria nº 20: a minha função ---
+await luisa.goto(`${BASE}/a-minha-funcao`);
+await luisa.waitForSelector("text=Funções da equipa >> nth=-1");
+const optDiana = await luisa.locator("select[aria-label='Pessoa'] option", { hasText: "Diana" }).getAttribute("value");
+await luisa.selectOption("select[aria-label='Pessoa']", optDiana);
+await luisa.waitForSelector("text=Rascunho — só a CEO vê");
+await luisa.click("button:has-text('Aprovar')");
+await luisa.waitForSelector("text=Descrição aprovada.");
+await diana.goto(`${BASE}/a-minha-funcao`);
+await diana.waitForSelector("text=Produzir as bases e os seus derivados >> nth=0");
+await diana.waitForSelector("text=No sistema não pode");
+await foto(diana, "34-a-minha-funcao");
+
+// --- Melhoria nº 1: ausências e substituições ---
+await diana.goto(`${BASE}/ausencias`);
+await diana.click("button:has-text('+ Pedir ausência')");
+const optMaira = await diana.locator("#a-sub option", { hasText: "Maira" }).getAttribute("value");
+await diana.selectOption("#a-sub", optMaira);
+await diana.selectOption("#a-mot", "doenca");
+await diana.click("role=dialog >> button:has-text('Enviar pedido')");
+await diana.waitForSelector("text=A aguardar decisão");
+await luisa.goto(`${BASE}/ausencias`);
+await luisa.locator("tr", { hasText: "Diana" }).locator("button:has-text('Decidir')").first().click();
+await luisa.check("role=dialog >> input[type=checkbox]");
+await luisa.click("role=dialog >> button:text-is('Aprovar')");
+await luisa.waitForSelector("text=Ausentes hoje");
+await foto(luisa, "35-ausencias-ceo");
+await maira.goto(`${BASE}/ausencias`);
+await maira.waitForSelector("text=Está a substituir");
+await foto(maira, "36-substituta-telemovel");
+luisa.once("dialog", (d) => d.accept());
+await luisa.locator("tr", { hasText: "Em curso" }).locator("button:has-text('Terminar')").first().click();
+await luisa.waitForSelector("text=Ausência cancelada.");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");
