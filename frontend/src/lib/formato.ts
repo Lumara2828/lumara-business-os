@@ -114,6 +114,7 @@ export const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho"
 
 export const CATEGORIAS_ARTIGO: Record<string, string> = {
   materia_prima: "Matéria-prima", embalagem: "Embalagem / material", produto_acabado: "Produto acabado",
+  intermedio: "Produto intermédio (ex.: base glicerinada)", kit: "Kit (composto por outros produtos)",
 };
 export const UNIDADES: Record<string, string> = { g: "g", kg: "kg", ml: "ml", l: "L", un: "un." };
 

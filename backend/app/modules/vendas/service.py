@@ -81,20 +81,62 @@ class LinhaIn:
     quantidade: Decimal
     desconto_kz: Decimal = Decimal(0)
     preco_unitario_kz: Decimal | None = None
+    escolhas: list | None = None  # kits: artigo escolhido para cada componente «à escolha», pela ordem
+
+
+def necessidades(l: LinhaEncomenda) -> list[tuple]:
+    """Artigos que saem do stock por esta linha: o próprio produto, ou os componentes do kit × número de kits."""
+    if l.componentes:
+        return [(UUID(c["artigo_id"]), Decimal(c["quantidade"]) * l.quantidade) for c in l.componentes]
+    return [(l.artigo_id, l.quantidade)]
+
+
+def _componentes_kit(db: Session, kit: Artigo, escolhas: list | None) -> list[dict]:
+    if not kit.componentes:
+        raise ErroNegocio("kit_sem_composicao", f"O kit «{kit.nome}» ainda não tem composição definida.")
+    slots = [c for c in kit.componentes if c.opcoes]
+    escolhas = list(escolhas or [])
+    if len(escolhas) != len(slots):
+        raise ErroNegocio("escolhas_em_falta", f"«{kit.nome}»: escolha {len(slots)} componente(s) "
+                          f"({', '.join(c.descricao for c in slots)}).")
+    res, k = [], 0
+    for c in kit.componentes:
+        if c.artigo_id:
+            a = c.artigo
+        else:
+            escolhido = str(escolhas[k])
+            k += 1
+            if escolhido not in c.opcoes:
+                raise ErroNegocio("escolha_invalida", f"«{kit.nome}»: opção inválida para «{c.descricao}».")
+            a = db.get(Artigo, UUID(escolhido))
+        res.append({"artigo_id": str(a.id), "nome": a.nome, "unidade": a.unidade, "quantidade": str(c.quantidade),
+                    "descricao": c.descricao})
+    return res
 
 
 def aplicar_linhas(db: Session, ctx: Contexto, e: Encomenda, linhas: list[LinhaIn], desconto_kz: Decimal, taxa_entrega_kz: Decimal) -> None:
     if not linhas:
         raise ErroNegocio("sem_produtos", "A encomenda tem de ter pelo menos um produto.")
-    ids = [l.artigo_id for l in linhas]
+    kits = {a.id for a in db.scalars(select(Artigo).where(Artigo.id.in_([l.artigo_id for l in linhas]), Artigo.categoria == "kit"))}
+    ids = [l.artigo_id for l in linhas if l.artigo_id not in kits]  # o mesmo kit pode repetir-se com escolhas diferentes
     if len(ids) != len(set(ids)):
         raise ErroNegocio("produto_repetido", "Cada produto só pode aparecer uma vez (ajuste a quantidade).")
     e.linhas.clear()
     subtotal, desc_linhas = Decimal(0), Decimal(0)
     for n, l in enumerate(linhas):
         a = db.get(Artigo, l.artigo_id)
-        if a is None or a.categoria != "produto_acabado" or not a.activo:
-            raise ErroNegocio("produto_invalido", "Só se vendem produtos acabados activos.")
+        if a is None or a.categoria not in ("produto_acabado", "kit") or not a.activo:
+            raise ErroNegocio("produto_invalido", "Só se vendem produtos acabados e kits activos.")
+        componentes = None
+        if a.categoria == "kit":
+            componentes = _componentes_kit(db, a, l.escolhas)
+            if a.kit_limite is not None:
+                vendidos = db.scalar(select(func.coalesce(func.sum(LinhaEncomenda.quantidade), 0)).join(Encomenda).where(
+                    LinhaEncomenda.artigo_id == a.id, Encomenda.estado != "cancelada", Encomenda.id != e.id)) or 0
+                ja_nesta = sum((x.quantidade for x in linhas[:n] if x.artigo_id == a.id), Decimal(0))
+                if vendidos + ja_nesta + l.quantidade > a.kit_limite:
+                    restam = max(Decimal(0), a.kit_limite - vendidos - ja_nesta)
+                    raise ErroNegocio("kit_esgotado", f"«{a.nome}» é limitado a {stock.fmt_qtd(a.kit_limite, 'kits')}: restam {stock.fmt_qtd(restam, '')}.")
         preco = preco_actual(db, a.id)
         if l.preco_unitario_kz is not None and (preco is None or kz(l.preco_unitario_kz) != kz(preco)):
             if not ctx.pode(P.PRECOS_ALTERAR):
@@ -106,7 +148,8 @@ def aplicar_linhas(db: Session, ctx: Contexto, e: Encomenda, linhas: list[LinhaI
         if l.desconto_kz > bruto:
             raise ErroNegocio("desconto_invalido", f"O desconto em «{a.nome}» excede o valor da linha.")
         e.linhas.append(LinhaEncomenda(artigo_id=a.id, quantidade=stock.q3(l.quantidade), preco_unitario_kz=kz(preco),
-                                       desconto_kz=kz(l.desconto_kz), total_kz=bruto - kz(l.desconto_kz), ordem=n))
+                                       desconto_kz=kz(l.desconto_kz), total_kz=bruto - kz(l.desconto_kz), ordem=n,
+                                       componentes=componentes))
         subtotal += bruto - kz(l.desconto_kz)
         desc_linhas += kz(l.desconto_kz)
     if desconto_kz > subtotal:
@@ -121,19 +164,33 @@ def aplicar_linhas(db: Session, ctx: Contexto, e: Encomenda, linhas: list[LinhaI
 
 
 def reservado(db: Session, artigo_id, excepto=None) -> Decimal:
-    q = (select(func.coalesce(func.sum(LinhaEncomenda.quantidade), 0)).join(Encomenda)
-         .where(Encomenda.estado == "pronta", LinhaEncomenda.artigo_id == artigo_id))
+    """Quantidade do artigo já separada em encomendas prontas (incluindo componentes de kits)."""
+    q = select(LinhaEncomenda).join(Encomenda).where(Encomenda.estado == "pronta")
     if excepto is not None:
         q = q.where(Encomenda.id != excepto)
-    return db.scalar(q)
+    total = Decimal(0)
+    for l in db.scalars(q).unique():
+        for aid, qtd in necessidades(l):
+            if aid == artigo_id:
+                total += qtd
+    return total
+
+
+def necessidades_encomenda(e: Encomenda) -> dict:
+    nec: dict = {}
+    for l in e.linhas:
+        for aid, qtd in necessidades(l):
+            nec[aid] = nec.get(aid, Decimal(0)) + qtd
+    return nec
 
 
 def disponibilidade(db: Session, e: Encomenda) -> list[dict]:
     res = []
-    for l in e.linhas:
-        disp = stock.saldo(db, l.artigo_id) - reservado(db, l.artigo_id, excepto=e.id)
-        res.append({"artigo": l.artigo.nome, "unidade": l.artigo.unidade, "necessario": l.quantidade, "disponivel": disp,
-                    "falta": max(Decimal(0), l.quantidade - disp)})
+    for aid, qtd in necessidades_encomenda(e).items():
+        a = db.get(Artigo, aid)
+        disp = stock.saldo(db, aid) - reservado(db, aid, excepto=e.id)
+        res.append({"artigo": a.nome, "unidade": a.unidade, "necessario": qtd, "disponivel": disp,
+                    "falta": max(Decimal(0), qtd - disp)})
     return res
 
 
@@ -156,7 +213,7 @@ def mudar_estado(db: Session, ctx: Contexto, e: Encomenda, novo: str, motivo: st
         if e.desconto_requer_aprovacao:
             raise ErroNegocio("desconto_por_aprovar", "O desconto desta encomenda aguarda aprovação da CEO.")
         if novo == "pronta":
-            for a in [l.artigo_id for l in e.linhas]:
+            for a in necessidades_encomenda(e):
                 stock.bloquear_artigo(db, a)
             faltas = [d for d in disponibilidade(db, e) if d["falta"] > 0]
             if faltas:
@@ -168,8 +225,8 @@ def mudar_estado(db: Session, ctx: Contexto, e: Encomenda, novo: str, motivo: st
         if e.desconto_requer_aprovacao:
             raise ErroNegocio("desconto_por_aprovar", "O desconto desta encomenda aguarda aprovação da CEO.")
         ref = codigo(e)
-        for l in e.linhas:
-            stock.registar_saida(db, ctx, l.artigo_id, l.quantidade, tipo="saida", referencia=ref, encomenda_id=e.id,
+        for aid, qtd in necessidades_encomenda(e).items():
+            stock.registar_saida(db, ctx, aid, qtd, tipo="saida", referencia=ref, encomenda_id=e.id,
                                  motivo=f"Venda {ref} — {e.cliente.nome}", is_demo=e.is_demo)
         e.entregue_em = agora()
     else:

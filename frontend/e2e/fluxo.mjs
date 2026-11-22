@@ -303,7 +303,7 @@ await luisa.click("role=tab[name='Resultados']");
 await luisa.waitForSelector("text=Demonstração de resultados");
 await foto(luisa, "26-financas-resultados");
 await luisa.click("role=tab[name='Custos por produto']");
-await luisa.waitForSelector("text=Custo de mão-de-obra directa");
+await luisa.waitForSelector("text=Margem-alvo geral");
 await foto(luisa, "27-custos-produto");
 assert.equal(await maira.goto(`${BASE}/financas`).then(() => maira.locator("text=Finanças e rentabilidade").count()), 0, "Maira não vê as finanças");
 
@@ -382,6 +382,22 @@ await foto(maira, "36-substituta-telemovel");
 luisa.once("dialog", (d) => d.accept());
 await luisa.locator("tr", { hasText: "Em curso" }).locator("button:has-text('Terminar')").first().click();
 await luisa.waitForSelector("text=Ausência cancelada.");
+
+// --- Melhorias nº 7–10 e 12: custos, margem-alvo e catálogo ---
+await luisa.goto(`${BASE}/catalogo`);
+await luisa.waitForSelector("text=Preços em vigor a");
+await foto(luisa, "40-catalogo-clientes");
+await luisa.click("role=tab >> text=Interno (com custos)");
+await luisa.waitForSelector("text=Catálogo interno — confidencial");
+await foto(luisa, "41-catalogo-interno");
+await maira.goto(`${BASE}/catalogo`);
+await maira.waitForSelector("text=Preços em vigor a");
+assert.equal(await maira.locator("text=Interno (com custos)").count(), 0, "Maira não vê o catálogo interno");
+await diana.goto(`${BASE}/stock`);
+await diana.click("button:has-text('+ Entrada')");
+await diana.waitForSelector("text=Compra importada em euros");
+await foto(diana, "42-entrada-importacao");
+await diana.keyboard.press("Escape");
 
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);

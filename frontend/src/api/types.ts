@@ -51,11 +51,13 @@ export interface ResumoExecutivo { nivel: "bom" | "atencao" | "critico" | "neutr
   atrasado: string[]; perdas: { nota: string; itens: string[] }; intervencao_ceo: string[]; prioridades: string[] }
 
 // --- Fase 2: stock e produção ---
-export type CategoriaArtigo = "materia_prima" | "embalagem" | "produto_acabado";
+export type CategoriaArtigo = "materia_prima" | "embalagem" | "produto_acabado" | "intermedio" | "kit";
 export interface Artigo { id: string; codigo: string; nome: string; categoria: CategoriaArtigo; unidade: string;
   stock_minimo: string; disponivel: string; abaixo_minimo: boolean; ruptura: boolean; fornecedor: { id: string; nome: string } | null;
   controla_lotes: boolean; descricao: string | null; activo: boolean; is_demo: boolean; ultima_entrada: string | null;
-  ultima_saida: string | null; custo_unitario: string | null; valor_stock: string | null; lotes?: Lote[] }
+  ultima_saida: string | null; custo_unitario: string | null; valor_stock: string | null; lotes?: Lote[];
+  margem_alvo_pct?: string | null; kit_limite?: string | null;
+  componentes?: { id: string; descricao: string; quantidade: string; artigo: { id: string; nome: string } | null; opcoes: string[] | null }[] | null }
 export interface Lote { id: string; numero: string; artigo: { id: string; codigo: string; nome: string; unidade: string; categoria: string };
   data_producao: string; validade: string | null; estado_validade: string; expirado: boolean; ordem_producao_id: string | null;
   lote_fornecedor: string | null; saldo: string | null; is_demo: boolean }
@@ -113,5 +115,6 @@ export interface EncomendaV { id: string; numero: number; codigo: string; estado
   pagamentos?: { id: number; valor_kz: string; data_pagamento: string; forma: string; referencia: string | null; motivo: string | null; registado_por: string }[];
   lotes_entregues?: { artigo: string; lote: string | null; quantidade: string; validade: string | null }[];
   devolucoes?: { id: string; data: string; valor_kz: string | null; motivo: string; itens: { artigo: string; quantidade: string; repor_stock: boolean }[] }[] }
-export interface PrecoV { artigo: { id: string; codigo: string; nome: string; unidade: string; is_demo: boolean }; preco_kz: string | null;
-  disponivel: string; custo_unitario: string | null; margem_bruta_pct: string | null }
+export interface PrecoV { artigo: { id: string; codigo: string; nome: string; unidade: string; is_demo: boolean; categoria?: string; descricao?: string | null };
+  preco_kz: string | null; disponivel: string; custo_unitario: string | null; margem_bruta_pct: string | null;
+  kit?: { limite: string | null; componentes: { descricao: string; quantidade: string; artigo: string | null; opcoes: { id: string; nome: string }[] }[] } | null }

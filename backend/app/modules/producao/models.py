@@ -33,6 +33,8 @@ class FichaTecnica(Base):
     requisitos_qualidade: Mapped[str | None] = mapped_column(Text)
     # Ficha de custos (Fase 5): outros custos atribuíveis por unidade (energia, água, etiquetas soltas…).
     outros_custos_unidade_kz: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    # Melhoria nº 10: mão-de-obra como valor fixo por lote (receita base), em alternativa a Kz/hora × tempo.
+    mao_obra_lote_kz: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     criada_em: Mapped[datetime] = criado_em()

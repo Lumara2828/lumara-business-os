@@ -170,7 +170,8 @@ def precos(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_d
     actuais = svc.precos_actuais(db)
     from app.modules.stock import service as stock_svc
     s = stock_svc.saldos(db)
-    prods = db.scalars(select(Artigo).where(Artigo.categoria == "produto_acabado", Artigo.activo.is_(True)).order_by(Artigo.nome)).unique().all()
+    prods = db.scalars(select(Artigo).where(Artigo.categoria.in_(("produto_acabado", "kit")), Artigo.activo.is_(True))
+                       .order_by(Artigo.categoria.desc(), Artigo.nome)).unique().all()
     ceo = ctx.pode(P.STOCK_VER_VALOR)
     res = []
     for a in prods:
@@ -178,7 +179,15 @@ def precos(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_d
         margem = None
         if ceo and p and a.custo_unitario is not None and p > 0:
             margem = str(((p - a.custo_unitario) / p * 100).quantize(Decimal("0.1")))
-        res.append({"artigo": {"id": a.id, "codigo": a.codigo, "nome": a.nome, "unidade": a.unidade, "is_demo": a.is_demo},
+        kit = None
+        if a.categoria == "kit":
+            nomes = {x.id: x.nome for x in prods}
+            kit = {"limite": None if a.kit_limite is None else str(a.kit_limite), "componentes": [
+                {"descricao": c.descricao, "quantidade": str(c.quantidade), "artigo": c.artigo.nome if c.artigo else None,
+                 "opcoes": [{"id": i, "nome": nomes.get(UUID(i)) or (db.get(Artigo, UUID(i)).nome if db.get(Artigo, UUID(i)) else "?")}
+                            for i in (c.opcoes or [])]} for c in a.componentes]}
+        res.append({"artigo": {"id": a.id, "codigo": a.codigo, "nome": a.nome, "unidade": a.unidade, "is_demo": a.is_demo,
+                               "categoria": a.categoria, "descricao": a.descricao}, "kit": kit,
                     "preco_kz": None if p is None else str(p), "disponivel": str(s.get(a.id, 0)),
                     "custo_unitario": (None if a.custo_unitario is None else str(a.custo_unitario)) if ceo else None, "margem_bruta_pct": margem})
     return res
@@ -193,8 +202,8 @@ def historico_precos(artigo_id: UUID, ctx: Contexto = Depends(requer(P.VENDAS_GE
 @router.post("/precos", status_code=201)
 def definir_preco(dados: PrecoIn, ctx: Contexto = Depends(requer(P.PRECOS_ALTERAR)), db: Session = Depends(get_db)):
     a = db.get(Artigo, dados.artigo_id)
-    if a is None or a.categoria != "produto_acabado":
-        raise ErroNegocio("produto_invalido", "Os preços de venda aplicam-se a produtos acabados.")
+    if a is None or a.categoria not in ("produto_acabado", "kit"):
+        raise ErroNegocio("produto_invalido", "Os preços de venda aplicam-se a produtos acabados e kits.")
     antigo = svc.preco_actual(db, a.id)
     p = Preco(artigo_id=a.id, preco_kz=svc.kz(dados.preco_kz), vigente_desde=dados.vigente_desde or hoje(), motivo=dados.motivo,
               definido_por_id=ctx.utilizador.id)
@@ -213,6 +222,7 @@ class LinhaIn(BaseModel):
     quantidade: Decimal = Field(gt=0, max_digits=14, decimal_places=3)
     desconto_kz: Decimal = Field(default=Decimal(0), **DINHEIRO)
     preco_unitario_kz: Decimal | None = Field(default=None, **DINHEIRO)
+    escolhas: list[UUID] | None = Field(default=None, max_length=20)  # kits: componente escolhido em cada lugar «à escolha»
 
 
 class EncomendaIn(BaseModel):
@@ -243,6 +253,7 @@ def encomenda_saida(ctx: Contexto, e: Encomenda, pago: Decimal, extra: bool = Fa
         "notas": e.notas, "motivo_cancelamento": e.motivo_cancelamento, "responsavel": {"id": e.responsavel.id, "nome": e.responsavel.nome},
         "desconto_requer_aprovacao": e.desconto_requer_aprovacao, "versao": e.versao, "is_demo": e.is_demo,
         "linhas": [{"artigo": {"id": l.artigo.id, "nome": l.artigo.nome, "unidade": l.artigo.unidade}, "quantidade": str(l.quantidade),
+                    "componentes": l.componentes,
                     **({"preco_unitario_kz": str(l.preco_unitario_kz), "desconto_kz": str(l.desconto_kz), "total_kz": str(l.total_kz)} if v else {})}
                    for l in e.linhas],
     }
@@ -594,31 +605,48 @@ def devolver(eid: UUID, dados: DevolucaoIn, ctx: Contexto = Depends(requer(P.VEN
         for i in d.itens:
             ja[i["artigo_id"]] = ja.get(i["artigo_id"], Decimal(0)) + Decimal(i["quantidade"])
     factor_desc = (1 - e.desconto_kz / e.subtotal_kz) if e.subtotal_kz else Decimal(1)
-    linhas = {l.artigo_id: l for l in e.linhas}
+    por_artigo: dict = {}
+    for l in e.linhas:
+        por_artigo.setdefault(l.artigo_id, []).append(l)
     total, registo = Decimal(0), []
     for it in dados.itens:
-        l = linhas.get(it.artigo_id)
-        if l is None:
+        ls = por_artigo.get(it.artigo_id)
+        if not ls:
             raise ErroNegocio("produto_invalido", "Esse produto não faz parte da encomenda.")
-        if it.quantidade + ja.get(str(it.artigo_id), Decimal(0)) > l.quantidade:
-            raise ErroNegocio("quantidade_excessiva", f"Não pode devolver mais do que foi entregue de {l.artigo.nome}.")
-        valor = svc.kz(l.total_kz / l.quantidade * it.quantidade * factor_desc)
+        entregue = sum((l.quantidade for l in ls), Decimal(0))
+        ja_dev = ja.get(str(it.artigo_id), Decimal(0))
+        if it.quantidade + ja_dev > entregue:
+            raise ErroNegocio("quantidade_excessiva", f"Não pode devolver mais do que foi entregue de {ls[0].artigo.nome}.")
+        # Distribui as unidades devolvidas pelas linhas (um kit pode estar em várias linhas, com escolhas diferentes).
+        a_repor: dict = {}
+        valor, salto, resto = Decimal(0), ja_dev, it.quantidade
+        for l in ls:
+            livre = l.quantidade - min(salto, l.quantidade)
+            salto = max(Decimal(0), salto - l.quantidade)
+            q = min(livre, resto)
+            if q <= 0:
+                continue
+            resto -= q
+            valor += l.total_kz / l.quantidade * q * factor_desc
+            for aid, n in svc.necessidades(l):
+                a_repor[aid] = a_repor.get(aid, Decimal(0)) + n / l.quantidade * q
+        valor = svc.kz(valor)
         total += valor
-        registo.append({"artigo_id": str(it.artigo_id), "artigo": l.artigo.nome, "quantidade": str(it.quantidade), "repor_stock": it.repor_stock,
+        registo.append({"artigo_id": str(it.artigo_id), "artigo": ls[0].artigo.nome, "quantidade": str(it.quantidade), "repor_stock": it.repor_stock,
                         "valor_kz": str(valor)})
         if it.repor_stock:
-            falta = it.quantidade
-            saidas = db.scalars(select(Movimento).where(Movimento.encomenda_id == e.id, Movimento.artigo_id == it.artigo_id,
-                                                        Movimento.tipo == "saida").order_by(Movimento.id.desc())).unique().all()
-            stock_svc.bloquear_artigo(db, it.artigo_id)
-            for m in saidas:
-                if falta <= 0:
-                    break
-                q = min(-m.quantidade, falta)
-                db.add(Movimento(artigo_id=it.artigo_id, lote_id=m.lote_id, tipo="devolucao", quantidade=q, custo_unitario=m.custo_unitario,
-                                 data_movimento=hoje(), motivo=f"Devolução de {svc.codigo(e)}: {dados.motivo}", referencia=svc.codigo(e),
-                                 encomenda_id=e.id, utilizador_id=ctx.utilizador.id))
-                falta -= q
+            for aid, falta in a_repor.items():
+                saidas = db.scalars(select(Movimento).where(Movimento.encomenda_id == e.id, Movimento.artigo_id == aid,
+                                                            Movimento.tipo == "saida").order_by(Movimento.id.desc())).unique().all()
+                stock_svc.bloquear_artigo(db, aid)
+                for m in saidas:
+                    if falta <= 0:
+                        break
+                    q = min(-m.quantidade, falta)
+                    db.add(Movimento(artigo_id=aid, lote_id=m.lote_id, tipo="devolucao", quantidade=q, custo_unitario=m.custo_unitario,
+                                     data_movimento=hoje(), motivo=f"Devolução de {svc.codigo(e)}: {dados.motivo}", referencia=svc.codigo(e),
+                                     encomenda_id=e.id, utilizador_id=ctx.utilizador.id))
+                    falta -= q
     d = Devolucao(encomenda_id=e.id, data_devolucao=hoje(), itens=registo, valor_kz=total, motivo=dados.motivo, registada_por_id=ctx.utilizador.id)
     db.add(d)
     db.flush()

@@ -9,15 +9,15 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Identity, Numeric, String, Text, UniqueConstraint,
+    BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Identity, Integer, Numeric, String, Text, UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.tipos import criado_em, enum_texto, pk_uuid
 
-CATEGORIAS = ("materia_prima", "embalagem", "produto_acabado")
+CATEGORIAS = ("materia_prima", "embalagem", "produto_acabado", "intermedio", "kit")
 UNIDADES = ("g", "kg", "ml", "l", "un")
 TIPOS_MOVIMENTO = ("entrada", "saida", "consumo", "producao", "perda", "ajustamento", "inventario", "devolucao")
 
@@ -53,6 +53,10 @@ class Artigo(Base):
     fornecedor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("fornecedores.id", ondelete="SET NULL"))
     controla_lotes: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     descricao: Mapped[str | None] = mapped_column(Text)
+    # Melhoria nº 10: margem-alvo própria (excepção à margem-alvo geral das Definições).
+    margem_alvo_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    # Melhoria nº 9: quantos kits se podem vender no total (ex.: edição limitada de 20).
+    kit_limite: Mapped[Decimal | None] = mapped_column(QTD)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     criado_em: Mapped[datetime] = criado_em()
@@ -62,7 +66,31 @@ class Artigo(Base):
     __table_args__ = (
         CheckConstraint("stock_minimo >= 0", name="artigo_minimo_positivo"),
         CheckConstraint("custo_unitario IS NULL OR custo_unitario >= 0", name="artigo_custo_positivo"),
-        CheckConstraint("categoria <> 'produto_acabado' OR controla_lotes", name="produto_acabado_com_lotes"),
+        CheckConstraint("categoria NOT IN ('produto_acabado', 'intermedio') OR controla_lotes", name="produto_acabado_com_lotes"),
+        CheckConstraint("categoria <> 'kit' OR NOT controla_lotes", name="kit_sem_lotes"),
+        CheckConstraint("margem_alvo_pct IS NULL OR (margem_alvo_pct >= 0 AND margem_alvo_pct < 100)", name="artigo_margem_alvo"),
+    )
+    componentes = relationship("ComponenteKit", foreign_keys="ComponenteKit.kit_id", lazy="selectin",
+                               cascade="all, delete-orphan", order_by="ComponenteKit.ordem")
+
+
+class ComponenteKit(Base):
+    """Melhoria nº 9: componente de um kit — fixo (artigo) ou «à escolha» entre opções, escolhido na venda."""
+    __tablename__ = "componentes_kit"
+
+    id: Mapped[uuid.UUID] = pk_uuid()
+    kit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("artigos.id", ondelete="CASCADE"), nullable=False, index=True)
+    ordem: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    descricao: Mapped[str] = mapped_column(String(120), nullable=False)
+    quantidade: Mapped[Decimal] = mapped_column(QTD, nullable=False)
+    artigo_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("artigos.id"))
+    opcoes: Mapped[list | None] = mapped_column(JSONB(none_as_null=True))  # ids de artigos possíveis quando é «à escolha»
+
+    artigo = relationship("Artigo", foreign_keys=[artigo_id], lazy="joined")
+
+    __table_args__ = (
+        CheckConstraint("quantidade > 0", name="componente_quantidade"),
+        CheckConstraint("(artigo_id IS NOT NULL) <> (opcoes IS NOT NULL)", name="componente_fixo_ou_escolha"),
     )
 
 

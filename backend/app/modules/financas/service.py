@@ -44,6 +44,7 @@ def mes_anterior(ano: int, m: int) -> tuple[int, int]:
 def ficha_custos(db: Session) -> list[dict]:
     custo_hora = config.obter(db, "custo_mao_obra_hora_kz")
     margem_min = config.obter(db, "margem_minima_pct")
+    margem_alvo_geral = config.obter(db, "margem_alvo_pct")
     precos = vendas.precos_actuais(db)
     res = []
     for f in db.scalars(select(FichaTecnica).where(FichaTecnica.activa.is_(True)).order_by(FichaTecnica.nome)).unique():
@@ -59,14 +60,16 @@ def ficha_custos(db: Session) -> list[dict]:
             else:
                 mp += v
         mo = None
-        if custo_hora is not None and f.tempo_producao_min:
+        if f.mao_obra_lote_kz is not None:  # melhoria nº 10: valor fixo por lote (receita base)
+            mo = f.mao_obra_lote_kz / f.rendimento
+        elif custo_hora is not None and f.tempo_producao_min:
             mo = Decimal(str(custo_hora)) * Decimal(f.tempo_producao_min) / 60 / f.rendimento
         outros = f.outros_custos_unidade_kz
         faltas = []
         if sem_custo:
             faltas.append("custo de " + ", ".join(sem_custo))
         if mo is None:
-            faltas.append("custo de mão-de-obra/hora (Definições) ou tempo de produção (ficha)")
+            faltas.append("mão-de-obra por lote, ou custo/hora (Definições) e tempo de produção (ficha)")
         total = mp + emb + (mo or 0) + (outros or 0)
         preco = precos.get(f.produto_id)
         margem = margem_pct = None
@@ -78,11 +81,58 @@ def ficha_custos(db: Session) -> list[dict]:
             alerta = "Margem negativa: o preço não cobre o custo."
         elif margem_pct is not None and margem_min is not None and margem_pct < Decimal(str(margem_min)):
             alerta = f"Margem abaixo do mínimo definido ({fpct(margem_min)})."
-        res.append({"ficha_id": f.id, "ficha": f"{f.codigo} v{f.versao}", "produto": {"id": f.produto.id, "nome": f.produto.nome, "unidade": f.produto.unidade},
+        alvo = f.produto.margem_alvo_pct if f.produto.margem_alvo_pct is not None else margem_alvo_geral
+        sugerido = preco_sugerido(total, alvo) if not faltas and f.produto.categoria == "produto_acabado" else None
+        res.append({"ficha_id": f.id, "categoria": f.produto.categoria, "mao_obra_lote_kz": None if f.mao_obra_lote_kz is None else str(f.mao_obra_lote_kz),
+                    "margem_alvo_pct": None if alvo is None else str(alvo), "margem_alvo_propria": f.produto.margem_alvo_pct is not None,
+                    "preco_sugerido_kz": None if sugerido is None else str(sugerido), "ficha": f"{f.codigo} v{f.versao}", "produto": {"id": f.produto.id, "nome": f.produto.nome, "unidade": f.produto.unidade},
                     "materias_primas_kz": str(d2(mp)), "embalagens_kz": str(d2(emb)), "mao_obra_kz": None if mo is None else str(d2(mo)),
                     "outros_kz": None if outros is None else str(d2(outros)), "custo_total_kz": str(d2(total)), "preco_kz": None if preco is None else str(preco),
                     "margem_bruta_kz": None if margem is None else str(d2(margem)), "margem_bruta_pct": None if margem_pct is None else str(margem_pct),
                     "completo": not faltas, "em_falta": faltas, "alerta": alerta, "tempo_producao_min": f.tempo_producao_min, "rendimento": str(f.rendimento)})
+    return res
+
+
+def preco_sugerido(custo, margem_pct) -> Decimal | None:
+    """Preço para a margem bruta pretendida sobre o preço de venda: custo ÷ (1 − margem). Arredondado às dezenas de Kz."""
+    if margem_pct is None or custo is None:
+        return None
+    m = Decimal(str(margem_pct)) / 100
+    if m >= 1:
+        return None
+    p = Decimal(custo) / (1 - m)
+    return (p / 10).quantize(Decimal("1"), rounding="ROUND_CEILING") * 10
+
+
+def custos_kits(db: Session) -> list[dict]:
+    """Melhoria nº 9/10: custo de cada kit pela soma dos componentes (nos «à escolha», do mais barato ao mais caro)."""
+    from app.modules.stock.models import Artigo
+    alvo_geral = config.obter(db, "margem_alvo_pct")
+    precos = vendas.precos_actuais(db)
+    res = []
+    for k in db.scalars(select(Artigo).where(Artigo.categoria == "kit", Artigo.activo.is_(True)).order_by(Artigo.nome)).unique():
+        minimo = maximo = Decimal(0)
+        faltas = []
+        linhas = []
+        for c in k.componentes:
+            opcoes = [c.artigo] if c.artigo else [db.get(Artigo, i) for i in (c.opcoes or [])]
+            custos = [o.custo_unitario for o in opcoes if o is not None and o.custo_unitario is not None]
+            sem = [o.nome for o in opcoes if o is not None and o.custo_unitario is None]
+            faltas += sem
+            if custos:
+                minimo += c.quantidade * min(custos)
+                maximo += c.quantidade * max(custos)
+            linhas.append({"descricao": c.descricao, "quantidade": str(c.quantidade), "opcoes": [o.nome for o in opcoes if o is not None]})
+        alvo = k.margem_alvo_pct if k.margem_alvo_pct is not None else alvo_geral
+        preco = precos.get(k.id)
+        completo = not faltas and bool(k.componentes)
+        res.append({"kit": {"id": k.id, "nome": k.nome, "codigo": k.codigo}, "componentes": linhas,
+                    "custo_min_kz": str(d2(minimo)), "custo_max_kz": str(d2(maximo)), "completo": completo,
+                    "em_falta": ["custo de " + ", ".join(sorted(set(faltas)))] if faltas else ([] if k.componentes else ["composição do kit"]),
+                    "preco_kz": None if preco is None else str(preco), "margem_alvo_pct": None if alvo is None else str(alvo),
+                    "preco_sugerido_kz": str(preco_sugerido(maximo, alvo)) if completo and alvo is not None else None,
+                    "margem_bruta_pct_min": str(((preco - maximo) / preco * 100).quantize(Decimal("0.1"))) if completo and preco else None,
+                    "kit_limite": None if k.kit_limite is None else str(k.kit_limite)})
     return res
 
 

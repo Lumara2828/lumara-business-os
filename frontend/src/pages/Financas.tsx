@@ -334,43 +334,91 @@ function Fixas() {
   );
 }
 
+interface CustoProduto {
+  ficha_id: string; ficha: string; categoria: string; produto: { id: string; nome: string; unidade: string }; materias_primas_kz: string; embalagens_kz: string;
+  mao_obra_kz: string | null; mao_obra_lote_kz: string | null; outros_kz: string | null; custo_total_kz: string; preco_kz: string | null;
+  margem_bruta_kz: string | null; margem_bruta_pct: string | null; completo: boolean; em_falta: string[]; alerta: string | null;
+  margem_alvo_pct: string | null; margem_alvo_propria: boolean; preco_sugerido_kz: string | null; rendimento: string;
+}
+interface CustoKit {
+  kit: { id: string; nome: string; codigo: string }; componentes: { descricao: string; quantidade: string; opcoes: string[] }[];
+  custo_min_kz: string; custo_max_kz: string; completo: boolean; em_falta: string[]; preco_kz: string | null; margem_alvo_pct: string | null;
+  preco_sugerido_kz: string | null; margem_bruta_pct_min: string | null; kit_limite: string | null;
+}
+
 function Custos() {
   const toast = useToast();
-  const { dados, recarregar } = useDados(() => api.get<{ custo_mao_obra_hora_kz: number | null; margem_minima_pct: number | null; produtos: { ficha_id: string; ficha: string;
-    produto: { nome: string; unidade: string }; materias_primas_kz: string; embalagens_kz: string; mao_obra_kz: string | null; outros_kz: string | null; custo_total_kz: string;
-    preco_kz: string | null; margem_bruta_kz: string | null; margem_bruta_pct: string | null; completo: boolean; em_falta: string[]; alerta: string | null }[] }>("/financas/custos-produtos"));
+  const { dados, recarregar } = useDados(() => api.get<{ custo_mao_obra_hora_kz: number | null; margem_minima_pct: number | null; margem_alvo_pct: number | null;
+    produtos: CustoProduto[]; kits: CustoKit[] }>("/financas/custos-produtos"));
   const [hora, setHora] = useState("");
+  const [alvo, setAlvo] = useState("");
   if (!dados) return <Carregando />;
-  const guardarHora = async () => { try { await api.put("/configuracao/custo_mao_obra_hora_kz", { valor: Number(hora) }); toast("Custo de mão-de-obra guardado."); setHora(""); recarregar(); } catch (e) { toast(mensagemErro(e), "erro"); } };
+  const guardar = async (chave: string, valor: string, msg: string) => {
+    try { await api.put(`/configuracao/${chave}`, { valor: Number(valor) }); toast(msg); setHora(""); setAlvo(""); recarregar(); } catch (e) { toast(mensagemErro(e), "erro"); }
+  };
   const outros = async (fid: string, actual: string | null) => {
     const v = prompt("Outros custos atribuíveis por unidade (Kz) — energia, água, etiquetas soltas…", actual ?? "");
     if (v === null) return;
     try { await api.put(`/financas/custos-produtos/${fid}`, { outros_custos_unidade_kz: v === "" ? null : v }); recarregar(); } catch (e) { toast(mensagemErro(e), "erro"); }
   };
+  const maoObraLote = async (p: CustoProduto) => {
+    const v = prompt(`Mão-de-obra por lote de ${Number(p.rendimento)} ${p.produto.unidade} (Kz). Vazio = usar custo/hora × tempo da ficha.`, p.mao_obra_lote_kz ?? "");
+    if (v === null) return;
+    try { await api.put(`/financas/custos-produtos/${p.ficha_id}`, { mao_obra_lote_kz: v === "" ? null : v }); recarregar(); } catch (e) { toast(mensagemErro(e), "erro"); }
+  };
+  const aplicarPreco = async (artigoId: string, nome: string, preco: string) => {
+    if (!confirm(`Definir o preço de «${limpa(nome)}» para ${fMoeda(preco)} a partir de hoje? Fica no histórico de preços.`)) return;
+    try { await api.post("/vendas/precos", { artigo_id: artigoId, preco_kz: preco, motivo: "Preço sugerido pela margem-alvo" }); toast("Preço definido."); recarregar(); }
+    catch (e) { toast(mensagemErro(e), "erro"); }
+  };
   return (
     <div className="space-y-3">
-      <div className="cartao p-3 flex flex-wrap items-end gap-2 text-sm">
-        <span>Custo de mão-de-obra directa: <b>{dados.custo_mao_obra_hora_kz !== null ? `${fMoeda(dados.custo_mao_obra_hora_kz)}/hora` : "por definir"}</b></span>
-        <input type="number" min={0} className="campo !w-36" placeholder="Kz por hora" value={hora} onChange={(e) => setHora(e.target.value)} />
-        <button className="btn-secundario" disabled={hora === ""} onClick={guardarHora}>Guardar</button>
+      <div className="cartao p-3 grid gap-3 md:grid-cols-2 text-sm">
+        <div className="flex flex-wrap items-end gap-2"><span>Mão-de-obra directa: <b>{dados.custo_mao_obra_hora_kz !== null ? `${fMoeda(dados.custo_mao_obra_hora_kz)}/hora` : "por definir"}</b></span>
+          <input type="number" min={0} className="campo !w-32" placeholder="Kz por hora" value={hora} onChange={(e) => setHora(e.target.value)} />
+          <button className="btn-secundario" disabled={hora === ""} onClick={() => guardar("custo_mao_obra_hora_kz", hora, "Custo de mão-de-obra guardado.")}>Guardar</button></div>
+        <div className="flex flex-wrap items-end gap-2"><span>Margem-alvo geral: <b>{dados.margem_alvo_pct !== null ? fPct(dados.margem_alvo_pct) : "por definir"}</b></span>
+          <input type="number" min={0} max={95} className="campo !w-24" placeholder="%" value={alvo} onChange={(e) => setAlvo(e.target.value)} />
+          <button className="btn-secundario" disabled={alvo === ""} onClick={() => guardar("margem_alvo_pct", alvo, "Margem-alvo guardada.")}>Guardar</button></div>
       </div>
-      <p className="text-xs text-terra-700">* Custo parcial: a margem só é calculada quando todos os custos estão registados. Custo por unidade = matérias-primas + embalagens + mão-de-obra directa (tempo da ficha × custo/hora ÷ rendimento) + outros. Margem bruta = preço − custo; margem % = margem ÷ preço × 100.</p>
+      <p className="text-xs text-terra-700">Custo por unidade = matérias-primas e intermédios + embalagens + mão-de-obra (valor por lote ÷ rendimento, ou tempo × custo/hora) + outros. Preço sugerido = custo ÷ (1 − margem-alvo), arredondado às dezenas. * Custo parcial: faltam dados. Os preços só mudam quando a Luísa os aplica.</p>
       {!dados.produtos.length ? <div className="cartao"><Vazio titulo="Sem fichas técnicas activas" /></div> : (
-        <div className="cartao overflow-x-auto"><table className="w-full text-sm min-w-[860px]">
+        <div className="cartao overflow-x-auto"><table className="w-full text-sm min-w-[980px]">
           <thead className="text-xs text-terra-700 border-b border-linho"><tr><th className="text-left p-3">Produto</th><th className="text-right px-2 whitespace-nowrap">Mat.-primas</th><th className="text-right px-2">Embalagens</th>
-            <th className="text-right px-2 whitespace-nowrap">Mão-de-obra</th><th className="text-right px-2">Outros</th><th className="text-right px-2 whitespace-nowrap">Custo/un.</th><th className="text-right px-2">Preço</th><th className="text-right pr-3">Margem</th></tr></thead>
+            <th className="text-right px-2 whitespace-nowrap">Mão-de-obra</th><th className="text-right px-2">Outros</th><th className="text-right px-2 whitespace-nowrap">Custo/un.</th><th className="text-right px-2">Preço</th><th className="text-right px-2">Margem</th><th className="text-right pr-3 whitespace-nowrap">Preço sugerido</th></tr></thead>
           <tbody className="divide-y divide-linho/60">{dados.produtos.map((p) => (
             <tr key={p.ficha_id} className={p.alerta ? "bg-red-50/50" : ""}>
-              <td className="p-3">{limpa(p.produto.nome)}<span className="block text-[11px] text-terra-500">{p.ficha}</span>
+              <td className="p-3">{limpa(p.produto.nome)}<span className="block text-[11px] text-terra-500">{p.ficha}{p.categoria === "intermedio" ? " · intermédio" : ""}</span>
                 {!p.completo && <span className="block text-[11px] text-aviso">Falta: {p.em_falta.map(limpa).join("; ")}</span>}
                 {p.alerta && <span className="block text-[11px] text-alerta">{p.alerta}</span>}</td>
               <td className="text-right">{fMoeda(p.materias_primas_kz)}</td><td className="text-right">{fMoeda(p.embalagens_kz)}</td>
-              <td className="text-right">{p.mao_obra_kz ? fMoeda(p.mao_obra_kz) : "—"}</td>
+              <td className="text-right"><button className="underline decoration-dotted" title="Mão-de-obra por lote" onClick={() => maoObraLote(p)}>{p.mao_obra_kz ? fMoeda(p.mao_obra_kz) : "definir"}</button>
+                {p.mao_obra_lote_kz && <span className="block text-[11px] text-terra-500">{fMoeda(p.mao_obra_lote_kz)}/lote</span>}</td>
               <td className="text-right"><button className="underline decoration-dotted" onClick={() => outros(p.ficha_id, p.outros_kz)}>{p.outros_kz ? fMoeda(p.outros_kz) : "definir"}</button></td>
               <td className="text-right font-medium whitespace-nowrap">{p.completo ? fMoeda(p.custo_total_kz) : <span className="text-aviso" title="Custo parcial: faltam dados">{fMoeda(p.custo_total_kz)}*</span>}</td>
-              <td className="text-right whitespace-nowrap">{p.preco_kz ? fMoeda(p.preco_kz) : "sem preço"}</td>
-              <td className={`text-right pr-3 font-medium ${p.margem_bruta_kz && Number(p.margem_bruta_kz) < 0 ? "text-alerta" : ""}`}>{p.margem_bruta_kz ? `${fMoeda(p.margem_bruta_kz)} (${p.margem_bruta_pct!.replace(".", ",")}%)` : p.completo ? "—" : "por calcular"}</td>
+              <td className="text-right whitespace-nowrap">{p.preco_kz ? fMoeda(p.preco_kz) : p.categoria === "intermedio" ? "—" : "sem preço"}</td>
+              <td className={`text-right font-medium ${p.margem_bruta_kz && Number(p.margem_bruta_kz) < 0 ? "text-alerta" : ""}`}>{p.margem_bruta_kz ? `${fMoeda(p.margem_bruta_kz)} (${fPct(p.margem_bruta_pct)})` : p.completo ? "—" : "por calcular"}</td>
+              <td className="text-right pr-3 whitespace-nowrap">{p.preco_sugerido_kz ? <>
+                <span className="font-medium">{fMoeda(p.preco_sugerido_kz)}</span><span className="block text-[11px] text-terra-500">margem {fPct(p.margem_alvo_pct)}{p.margem_alvo_propria ? " (própria)" : ""}</span>
+                {p.preco_sugerido_kz !== (p.preco_kz ? String(Math.round(Number(p.preco_kz))) : null) &&
+                  <button className="text-[11px] text-folha-700 underline" onClick={() => aplicarPreco(p.produto.id, p.produto.nome, p.preco_sugerido_kz!)}>Aplicar como preço</button>}</> : "—"}</td>
             </tr>))}</tbody></table></div>
+      )}
+      {dados.kits.length > 0 && (
+        <div className="cartao overflow-x-auto"><table className="w-full text-sm min-w-[760px]">
+          <thead className="text-xs text-terra-700 border-b border-linho"><tr><th className="text-left p-3">Kit</th><th className="text-right px-2">Custo (mín.–máx.)</th><th className="text-right px-2">Preço</th><th className="text-right px-2">Margem mínima</th><th className="text-right pr-3">Preço sugerido</th></tr></thead>
+          <tbody className="divide-y divide-linho/60">{dados.kits.map((k) => (
+            <tr key={k.kit.id}>
+              <td className="p-3">{limpa(k.kit.nome)}{k.kit_limite && <span className="text-[11px] text-terra-500"> · limitado a {Number(k.kit_limite)}</span>}
+                <span className="block text-[11px] text-terra-500">{k.componentes.map((c) => `${Number(c.quantidade)} × ${c.opcoes.length > 1 ? c.descricao : limpa(c.opcoes[0] ?? c.descricao)}`).join(" + ")}</span>
+                {!k.completo && <span className="block text-[11px] text-aviso">Falta: {k.em_falta.map(limpa).join("; ")}</span>}</td>
+              <td className="text-right whitespace-nowrap">{fMoeda(k.custo_min_kz)}{k.custo_max_kz !== k.custo_min_kz ? ` – ${fMoeda(k.custo_max_kz)}` : ""}</td>
+              <td className="text-right whitespace-nowrap">{k.preco_kz ? fMoeda(k.preco_kz) : "sem preço"}</td>
+              <td className="text-right">{k.margem_bruta_pct_min ? fPct(k.margem_bruta_pct_min) : "—"}</td>
+              <td className="text-right pr-3 whitespace-nowrap">{k.preco_sugerido_kz ? <><span className="font-medium">{fMoeda(k.preco_sugerido_kz)}</span>
+                <button className="block ml-auto text-[11px] text-folha-700 underline" onClick={() => aplicarPreco(k.kit.id, k.kit.nome, k.preco_sugerido_kz!)}>Aplicar como preço</button></> : "—"}</td>
+            </tr>))}</tbody></table>
+          <p className="text-xs text-terra-700 p-3">Nos componentes à escolha, o preço sugerido usa a opção mais cara, para a margem nunca ficar abaixo do alvo.</p></div>
       )}
     </div>
   );

@@ -79,7 +79,7 @@ function NovaEncomenda({ rapida, aoFechar, aoGuardar, eventoId }: { rapida: bool
   const precos = useDados(() => api.get<PrecoV[]>("/vendas/precos"));
   const [f, setF] = useState({ cliente_id: "", canal: rapida ? "feira" : "whatsapp", forma: "multicaixa_express", data_prevista: somarDias(hojeIso(), 2),
     tipo_entrega: "levantamento", morada_entrega: "", taxa_entrega_kz: "", desconto_kz: "", notas: "", valor_pago_kz: "" });
-  const [linhas, setLinhas] = useState<{ artigo_id: string; quantidade: string }[]>([{ artigo_id: "", quantidade: "1" }]);
+  const [linhas, setLinhas] = useState<{ artigo_id: string; quantidade: string; escolhas?: string[] }[]>([{ artigo_id: "", quantidade: "1" }]);
   const [novaCliente, setNovaCliente] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -90,6 +90,10 @@ function NovaEncomenda({ rapida, aoFechar, aoGuardar, eventoId }: { rapida: bool
     e.preventDefault();
     const ls = linhas.filter((l) => l.artigo_id && Number(l.quantidade) > 0);
     if (!ls.length) return setErro("Adicione pelo menos um produto.");
+    for (const l of ls) {
+      const slots = pr[l.artigo_id]?.kit?.componentes.filter((c) => c.opcoes.length) ?? [];
+      if (slots.length && (l.escolhas ?? []).filter(Boolean).length !== slots.length) return setErro(`Escolha os componentes de «${limpa(pr[l.artigo_id].artigo.nome)}».`);
+    }
     if (!rapida && !f.cliente_id) return setErro("Escolha a cliente.");
     setOcupado(true); setErro(null);
     try {
@@ -117,13 +121,26 @@ function NovaEncomenda({ rapida, aoFechar, aoGuardar, eventoId }: { rapida: bool
           {Object.entries(FORMAS_PAGAMENTO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
         <div className="sm:col-span-2 space-y-2"><p className="rotulo">Produtos *</p>
           {linhas.map((l, n) => (
-            <div key={n} className="flex gap-2 items-center">
-              <select className="campo" aria-label={`Produto ${n + 1}`} value={l.artigo_id} onChange={(e) => setLinhas(linhas.map((x, k) => k === n ? { ...x, artigo_id: e.target.value } : x))}>
+            <div key={n} className="flex flex-wrap gap-2 items-center">
+              <select className="campo !w-auto flex-1 min-w-[12rem]" aria-label={`Produto ${n + 1}`} value={l.artigo_id} onChange={(e) => setLinhas(linhas.map((x, k) => k === n ? { ...x, artigo_id: e.target.value, escolhas: [] } : x))}>
                 <option value="">Escolher…</option>
                 {precos.dados?.map((p) => <option key={p.artigo.id} value={p.artigo.id} disabled={!p.preco_kz}>
-                  {limpa(p.artigo.nome)} — {p.preco_kz ? fMoeda(p.preco_kz) : "sem preço"} · {fQtd(p.disponivel)} em stock</option>)}</select>
+                  {limpa(p.artigo.nome)} — {p.preco_kz ? fMoeda(p.preco_kz) : "sem preço"} · {p.kit ? (p.kit.limite ? `kit limitado a ${Number(p.kit.limite)}` : "kit") : `${fQtd(p.disponivel)} em stock`}</option>)}</select>
               <input type="number" min={1} step="any" className="campo !w-24" aria-label="Quantidade" value={l.quantidade} onChange={(e) => setLinhas(linhas.map((x, k) => k === n ? { ...x, quantidade: e.target.value } : x))} />
               <button type="button" className="btn-fantasma" aria-label="Remover" onClick={() => setLinhas(linhas.filter((_, k) => k !== n))}>✕</button>
+              {pr[l.artigo_id]?.kit && (
+                <div className="basis-full w-full pl-2 border-l-2 border-folha-300 space-y-1">
+                  {pr[l.artigo_id].kit!.componentes.map((c, ci) => {
+                    const slot = pr[l.artigo_id].kit!.componentes.slice(0, ci).filter((x) => x.opcoes.length).length;
+                    return c.opcoes.length ? (
+                      <select key={ci} className="campo" aria-label={`${c.descricao} (${n + 1})`} value={l.escolhas?.[slot] ?? ""}
+                        onChange={(e) => setLinhas(linhas.map((x, k) => { if (k !== n) return x; const esc = [...(x.escolhas ?? [])]; esc[slot] = e.target.value; return { ...x, escolhas: esc }; }))}>
+                        <option value="">{Number(c.quantidade)} × {c.descricao}: escolher…</option>
+                        {c.opcoes.map((o) => <option key={o.id} value={o.id}>{limpa(o.nome)}</option>)}</select>
+                    ) : <p key={ci} className="text-xs text-terra-700">{Number(c.quantidade)} × {limpa(c.artigo ?? c.descricao)}</p>;
+                  })}
+                  <p className="text-xs text-terra-700">Para o mesmo kit com outras escolhas, acrescente outra linha.</p>
+                </div>)}
             </div>))}
           <button type="button" className="btn-fantasma" onClick={() => setLinhas([...linhas, { artigo_id: "", quantidade: "1" }])}>+ Produto</button>
         </div>

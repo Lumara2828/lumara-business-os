@@ -433,11 +433,12 @@ def gerar_fixas(ano: int, mes: int = Query(ge=1, le=12), ctx: Contexto = Depends
 def custos_produtos(ctx: Contexto = Depends(requer(P.FINANCAS_VER)), db: Session = Depends(get_db)):
     from app.modules.configuracao import service as config
     return {"custo_mao_obra_hora_kz": config.obter(db, "custo_mao_obra_hora_kz"), "margem_minima_pct": config.obter(db, "margem_minima_pct"),
-            "produtos": svc.ficha_custos(db)}
+            "margem_alvo_pct": config.obter(db, "margem_alvo_pct"), "produtos": svc.ficha_custos(db), "kits": svc.custos_kits(db)}
 
 
 class OutrosCustosIn(BaseModel):
     outros_custos_unidade_kz: Decimal | None = Field(default=None, ge=0, **DIN)
+    mao_obra_lote_kz: Decimal | None = Field(default=None, ge=0, **DIN)  # melhoria nº 10: por lote (receita base)
 
 
 @router.put("/custos-produtos/{ficha_id}")
@@ -445,10 +446,15 @@ def outros_custos(ficha_id: UUID, dados: OutrosCustosIn, ctx: Contexto = Depends
     f = db.get(FichaTecnica, ficha_id)
     if f is None:
         raise nao_encontrado("Ficha técnica")
-    antigo = f.outros_custos_unidade_kz
-    f.outros_custos_unidade_kz = dados.outros_custos_unidade_kz
+    antigo = (f.outros_custos_unidade_kz, f.mao_obra_lote_kz)
+    campos = dados.model_dump(exclude_unset=True)
+    if "outros_custos_unidade_kz" in campos:
+        f.outros_custos_unidade_kz = dados.outros_custos_unidade_kz
+    if "mao_obra_lote_kz" in campos:
+        f.mao_obra_lote_kz = dados.mao_obra_lote_kz
     registar(db, utilizador_id=ctx.utilizador.id, accao="custos", entidade="ficha_tecnica", entidade_id=f.id,
-             resumo=f"Outros custos/unidade de {f.produto.nome}: {antigo} → {dados.outros_custos_unidade_kz}", ip=ctx.ip)
+             resumo=f"Custos de {f.produto.nome}: outros/unidade {antigo[0]} → {f.outros_custos_unidade_kz}; "
+                    f"mão-de-obra/lote {antigo[1]} → {f.mao_obra_lote_kz}", ip=ctx.ip)
     db.commit()
     return {"ok": True}
 

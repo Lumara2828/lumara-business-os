@@ -21,7 +21,8 @@ from app.core.tempo import formatar_data, hoje
 from app.dependencies import Contexto
 from app.modules.stock.models import Artigo, Lote, Movimento
 
-ROTULO_CATEGORIA = {"materia_prima": "Matéria-prima", "embalagem": "Embalagem / material", "produto_acabado": "Produto acabado"}
+ROTULO_CATEGORIA = {"materia_prima": "Matéria-prima", "embalagem": "Embalagem / material", "produto_acabado": "Produto acabado",
+                    "intermedio": "Produto intermédio", "kit": "Kit"}
 ROTULO_TIPO = {"entrada": "Entrada", "saida": "Saída", "consumo": "Consumo", "producao": "Produção", "perda": "Perda",
                "ajustamento": "Ajustamento", "inventario": "Inventário físico"}
 Q3 = Decimal("0.001")
@@ -135,6 +136,8 @@ def registar_entrada(db: Session, ctx: Contexto, artigo_id, d: DadosEntrada, *, 
     artigo = bloquear_artigo(db, artigo_id)
     if not artigo.activo:
         raise ErroNegocio("artigo_inactivo", "Artigo inactivo.")
+    if artigo.categoria == "kit":
+        raise ErroNegocio("kit_sem_stock", "Os kits não têm stock próprio: o stock sai dos componentes quando o kit é vendido.")
     if d.quantidade <= 0:
         raise ErroNegocio("quantidade_invalida", "A quantidade deve ser positiva.")
     data_mov = d.data_movimento or hoje()

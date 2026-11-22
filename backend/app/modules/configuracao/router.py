@@ -25,6 +25,10 @@ LIMITES = {
     "dia_planeamento": (0, 6),
     "dia_revisao": (0, 6),
     "automacao_resumo_semanal": (0, 1),
+    "margem_alvo_pct": (0, 95),
+    "cambio_kz_eur": (1, 100_000),
+    "iva_importacao_pct": (0, 100),
+    "frete_importacao_kz_kg": (0, 10_000_000),
     "automacao_relatorio_mensal": (0, 1),
 }
 
@@ -33,7 +37,8 @@ class ValorIn(BaseModel):
     valor: int | float | str
 
 
-FINANCEIROS = {"custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct"}
+FINANCEIROS = {"custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct", "margem_alvo_pct", "cambio_kz_eur",
+               "iva_importacao_pct", "frete_importacao_kz_kg"}
 
 
 @router.get("")
@@ -44,7 +49,7 @@ def listar(ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_d
 
 @router.put("/{chave}")
 def definir(chave: str, dados: ValorIn, ctx: Contexto = Depends(requer(P.CONFIGURACAO_GERIR)), db: Session = Depends(get_db)):
-    if chave in ("custo_mao_obra_hora_kz", "meta_facturacao_mensal_kz", "margem_minima_pct") and not ctx.pode(P.FINANCAS_VER):
+    if chave in FINANCEIROS and not ctx.pode(P.FINANCAS_VER):
         raise ErroNegocio("sem_permissao", "Parâmetro financeiro reservado à CEO.", 403)
     if chave not in LIMITES:
         raise ErroNegocio("chave_invalida", "Este parâmetro não pode ser alterado.")

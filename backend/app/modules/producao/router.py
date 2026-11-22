@@ -80,12 +80,12 @@ def ficha_saida(ctx: Contexto, f: FichaTecnica, db: Session) -> dict:
 
 def _validar_ficha(db: Session, dados: FichaIn) -> None:
     p = db.get(Artigo, dados.produto_id)
-    if p is None or p.categoria != "produto_acabado":
-        raise ErroNegocio("produto_invalido", "O produto da ficha tem de ser um artigo de produto acabado.")
+    if p is None or p.categoria not in ("produto_acabado", "intermedio"):
+        raise ErroNegocio("produto_invalido", "O produto da ficha tem de ser um produto acabado ou um produto intermédio.")
     for i in dados.ingredientes:
         a = db.get(Artigo, i.artigo_id)
-        if a is None or a.categoria == "produto_acabado":
-            raise ErroNegocio("ingrediente_invalido", "Ingredientes têm de ser matérias-primas ou embalagens existentes.")
+        if a is None or a.categoria in ("produto_acabado", "kit") or a.id == p.id:
+            raise ErroNegocio("ingrediente_invalido", "Ingredientes têm de ser matérias-primas, embalagens ou produtos intermédios (ex.: base glicerinada).")
 
 
 def _aplicar(f: FichaTecnica, dados: FichaIn) -> None:
@@ -414,7 +414,7 @@ def resumo(ctx: Contexto = Depends(requer(P.STOCK_VER)), db: Session = Depends(g
     """O que é preciso produzir esta semana: ordens abertas + produtos acabados abaixo do mínimo."""
     abertas = db.scalars(select(OrdemProducao).where(OrdemProducao.estado.in_(("planeada", "em_curso")))
                          .order_by(OrdemProducao.data_prevista)).unique().all()
-    abaixo = [(a, q) for a, q in stock.abaixo_minimo(db) if a.categoria == "produto_acabado"]
+    abaixo = [(a, q) for a, q in stock.abaixo_minimo(db) if a.categoria in ("produto_acabado", "intermedio")]
     return {"estado": svc.estado_producao(db), "ordens_abertas": [ordem_saida(ctx, o) for o in abertas],
             "produtos_abaixo_minimo": [{"id": a.id, "nome": a.nome, "unidade": a.unidade, "disponivel": str(q),
                                         "stock_minimo": str(a.stock_minimo)} for a, q in abaixo],

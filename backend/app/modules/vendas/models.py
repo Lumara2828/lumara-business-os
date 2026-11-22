@@ -125,6 +125,8 @@ class LinhaEncomenda(Base):
     desconto_kz: Mapped[Decimal] = mapped_column(KZ, nullable=False, default=0)
     total_kz: Mapped[Decimal] = mapped_column(KZ, nullable=False)
     ordem: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Melhoria nº 9: num kit, os componentes escolhidos na venda [{"artigo_id", "nome", "unidade", "quantidade"}] por kit.
+    componentes: Mapped[list | None] = mapped_column(JSONB(none_as_null=True))
 
     artigo = relationship("Artigo", lazy="joined")
 

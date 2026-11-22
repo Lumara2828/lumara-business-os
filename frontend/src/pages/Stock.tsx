@@ -146,7 +146,8 @@ function DetalheArtigo({ id, aoFechar, mexer, aoAccao, aoEditar, aoRastrear }: {
             {x.custo_unitario !== null && <Info r="Custo médio" v={`${fMoeda(x.custo_unitario)} / ${UNIDADES[x.unidade]}`} />}
             {x.valor_stock !== null && <Info r="Valor em stock" v={fMoeda(x.valor_stock)} />}
           </div>
-          {mexer && <div className="flex flex-wrap gap-2 border-y border-linho py-3">
+          {x.categoria === "kit" && <ComposicaoKit kit={x} aoMudar={a.recarregar} aoEditar={mexer ? () => aoEditar(x) : undefined} />}
+          {mexer && x.categoria !== "kit" && <div className="flex flex-wrap gap-2 border-y border-linho py-3">
             <button className="btn-primario" onClick={() => aoAccao("entrada", x)}>Entrada</button>
             <button className="btn-secundario" onClick={() => aoAccao("saida", x)}>Saída / perda</button>
             <button className="btn-secundario" onClick={() => aoAccao("inventario", x)}>Contagem física</button>
@@ -327,14 +328,19 @@ function FormArtigo({ artigo, aoFechar, aoGuardar }: { artigo: Artigo | null; ao
   const a = artigo;
   const [f, setF] = useState({ codigo: a?.codigo ?? "", nome: a?.nome ?? "", categoria: a?.categoria ?? "materia_prima", unidade: a?.unidade ?? "g",
     stock_minimo: a?.stock_minimo ?? "0", fornecedor_id: a?.fornecedor?.id ?? "", controla_lotes: a?.controla_lotes ?? true,
-    descricao: a?.descricao ?? "", activo: a?.activo ?? true, custo_unitario: a?.custo_unitario ?? "" });
+    descricao: a?.descricao ?? "", activo: a?.activo ?? true, custo_unitario: a?.custo_unitario ?? "",
+    margem_alvo_pct: a?.margem_alvo_pct ?? "", kit_limite: a?.kit_limite ?? "" });
+  const kit = f.categoria === "kit";
+  const comLotes = f.categoria === "produto_acabado" || f.categoria === "intermedio";
   const [erro, setErro] = useState<string | null>(null);
   const m = (k: keyof typeof f, v: unknown) => setF((x) => ({ ...x, [k]: v }));
   const submeter = async (e: FormEvent) => {
     e.preventDefault();
     const corpo: Record<string, unknown> = { ...f, fornecedor_id: f.fornecedor_id || null, descricao: f.descricao || null,
-      controla_lotes: f.categoria === "produto_acabado" ? true : f.controla_lotes, custo_unitario: f.custo_unitario === "" ? null : f.custo_unitario };
-    if (!pode("stock.ver_valor")) delete corpo.custo_unitario;
+      controla_lotes: comLotes ? true : kit ? false : f.controla_lotes, custo_unitario: f.custo_unitario === "" ? null : f.custo_unitario,
+      margem_alvo_pct: f.margem_alvo_pct === "" ? null : f.margem_alvo_pct, kit_limite: kit && f.kit_limite !== "" ? f.kit_limite : null,
+      unidade: kit ? "un" : f.unidade, stock_minimo: kit ? "0" : f.stock_minimo };
+    if (!pode("stock.ver_valor")) { delete corpo.custo_unitario; delete corpo.margem_alvo_pct; }
     try {
       if (a) await api.put(`/stock/artigos/${a.id}`, corpo); else await api.post("/stock/artigos", corpo);
       toast("Artigo guardado."); aoGuardar();
@@ -352,11 +358,16 @@ function FormArtigo({ artigo, aoFechar, aoGuardar }: { artigo: Artigo | null; ao
         <div><label className="rotulo">Stock mínimo</label><input type="number" min={0} step="any" className="campo" value={f.stock_minimo} onChange={(e) => m("stock_minimo", e.target.value)} /></div>
         <div><label className="rotulo">Fornecedor</label><select className="campo" value={f.fornecedor_id} onChange={(e) => m("fornecedor_id", e.target.value)}>
           <option value="">—</option>{fornecedores.dados?.filter((x) => x.activo).map((x) => <option key={x.id} value={x.id}>{limpa(x.nome)}</option>)}</select></div>
-        {pode("stock.ver_valor") && <div><label className="rotulo">Custo unitário (Kz) — opcional</label><input type="number" min={0} step="any" className="campo" value={f.custo_unitario} onChange={(e) => m("custo_unitario", e.target.value)} /></div>}
+        {pode("stock.ver_valor") && !kit && <div><label className="rotulo">Custo unitário (Kz) — opcional</label><input type="number" min={0} step="any" className="campo" value={f.custo_unitario} onChange={(e) => m("custo_unitario", e.target.value)} /></div>}
+        {pode("stock.ver_valor") && (kit || f.categoria === "produto_acabado") && <div><label className="rotulo" htmlFor="ar-margem">Margem-alvo própria (%) — vazio = a geral das Definições</label>
+          <input id="ar-margem" type="number" min={0} max={95} step="any" className="campo" value={f.margem_alvo_pct} onChange={(e) => m("margem_alvo_pct", e.target.value)} /></div>}
+        {kit && <div><label className="rotulo" htmlFor="ar-limite">Limite de kits à venda (ex.: 20) — vazio = sem limite</label>
+          <input id="ar-limite" type="number" min={1} step="1" className="campo" value={f.kit_limite} onChange={(e) => m("kit_limite", e.target.value)} /></div>}
+        {kit && <p className="sm:col-span-2 text-xs text-terra-700">Os kits não têm stock próprio: o stock sai dos componentes quando o kit é vendido. Depois de guardar, defina a composição no artigo.</p>}
         <div className="sm:col-span-2"><label className="rotulo">Descrição</label><textarea className="campo" rows={2} value={f.descricao} onChange={(e) => m("descricao", e.target.value)} /></div>
         <div className="flex flex-col gap-2 text-sm">
-          <label className="flex gap-2"><input type="checkbox" className="accent-folha-600" disabled={f.categoria === "produto_acabado"}
-            checked={f.categoria === "produto_acabado" || f.controla_lotes} onChange={(e) => m("controla_lotes", e.target.checked)} />Controla lotes e validades</label>
+          {!kit && <label className="flex gap-2"><input type="checkbox" className="accent-folha-600" disabled={comLotes}
+            checked={comLotes || f.controla_lotes} onChange={(e) => m("controla_lotes", e.target.checked)} />Controla lotes e validades</label>}
           <label className="flex gap-2"><input type="checkbox" className="accent-folha-600" checked={f.activo} onChange={(e) => m("activo", e.target.checked)} />Activo</label>
         </div>
         {erro && <p className="sm:col-span-2 text-sm text-alerta">{erro}</p>}
@@ -374,7 +385,7 @@ function FormMovimento({ accao, aoFechar, aoGuardar }: { accao: NonNullable<Acca
   const [artigoId, setArtigoId] = useState(accao.artigo?.id ?? "");
   const lotes = useDados(() => artigoId ? api.get<Lote[]>("/stock/lotes", { artigo_id: artigoId }) : Promise.resolve([] as Lote[]), [artigoId]);
   const [f, setF] = useState({ quantidade: "", tipo: "saida", lote_id: "", lote_numero: "", validade: "", lote_fornecedor: "", fornecedor_id: "",
-    custo_unitario: "", data_movimento: hojeIso(), referencia: "", motivo: "" });
+    custo_unitario: "", data_movimento: hojeIso(), referencia: "", motivo: "", importada: "", valor_eur: "", peso_kg: "", cambio: "", iva: "", frete: "" });
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
   const artigo = artigos.dados?.find((a) => a.id === artigoId);
@@ -389,9 +400,11 @@ function FormMovimento({ accao, aoFechar, aoGuardar }: { accao: NonNullable<Acca
     const nulo = (v: string) => (v === "" ? null : v);
     try {
       if (accao.tipo === "entrada") {
-        await api.post("/stock/movimentos/entrada", { artigo_id: artigoId, quantidade: f.quantidade, custo_unitario: nulo(f.custo_unitario),
+        const importacao = f.importada ? { valor_eur: f.valor_eur, peso_kg: f.peso_kg || "0", cambio_kz_eur: nulo(f.cambio),
+          iva_pct: nulo(f.iva), frete_kz_kg: nulo(f.frete) } : null;
+        await api.post("/stock/movimentos/entrada", { artigo_id: artigoId, quantidade: f.quantidade, custo_unitario: importacao ? null : nulo(f.custo_unitario),
           lote_numero: nulo(f.lote_numero), validade: nulo(f.validade), lote_fornecedor: nulo(f.lote_fornecedor), fornecedor_id: nulo(f.fornecedor_id),
-          data_movimento: f.data_movimento, referencia: nulo(f.referencia), motivo: nulo(f.motivo) });
+          data_movimento: f.data_movimento, referencia: nulo(f.referencia), motivo: nulo(f.motivo), importacao });
         toast("Entrada registada.");
       } else if (accao.tipo === "saida") {
         await api.post("/stock/movimentos/saida", { artigo_id: artigoId, quantidade: f.quantidade, tipo: f.tipo, lote_id: nulo(f.lote_id),
@@ -412,7 +425,7 @@ function FormMovimento({ accao, aoFechar, aoGuardar }: { accao: NonNullable<Acca
         <div className="sm:col-span-2"><label className="rotulo" htmlFor="mv-artigo">Artigo *</label>
           <select id="mv-artigo" className="campo" value={artigoId} onChange={(e) => { setArtigoId(e.target.value); m("lote_id", ""); }}>
             <option value="">Escolher…</option>
-            {artigos.dados?.map((a) => <option key={a.id} value={a.id}>{limpa(a.nome)} — {fQtd(a.disponivel, a.unidade)} disponível</option>)}
+            {artigos.dados?.filter((a) => a.categoria !== "kit").map((a) => <option key={a.id} value={a.id}>{limpa(a.nome)} — {fQtd(a.disponivel, a.unidade)} disponível</option>)}
           </select></div>
         {accao.tipo === "saida" && <div><label className="rotulo">Tipo</label><select className="campo" value={f.tipo} onChange={(e) => m("tipo", e.target.value)}>
           <option value="saida">Saída (venda, evento, oferta…)</option><option value="consumo">Consumo</option><option value="perda">Perda (motivo obrigatório)</option></select></div>}
@@ -432,7 +445,18 @@ function FormMovimento({ accao, aoFechar, aoGuardar }: { accao: NonNullable<Acca
             <option value="">{artigo?.fornecedor ? `Habitual: ${limpa(artigo.fornecedor.nome)}` : "—"}</option>
             {fornecedores.dados?.filter((x) => x.activo).map((x) => <option key={x.id} value={x.id}>{limpa(x.nome)}</option>)}</select></div>
           {artigo?.controla_lotes && <div><label className="rotulo">Lote do fornecedor</label><input className="campo" value={f.lote_fornecedor} onChange={(e) => m("lote_fornecedor", e.target.value)} /></div>}
-          <div><label className="rotulo">Custo unitário (Kz){pode("stock.ver_valor") ? "" : " — se constar da factura"}</label><input type="number" min={0} step="any" className="campo" value={f.custo_unitario} onChange={(e) => m("custo_unitario", e.target.value)} /></div>
+          {!f.importada && <div><label className="rotulo">Custo unitário (Kz){pode("stock.ver_valor") ? "" : " — se constar da factura"}</label><input type="number" min={0} step="any" className="campo" value={f.custo_unitario} onChange={(e) => m("custo_unitario", e.target.value)} /></div>}
+          <label className="sm:col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-folha-600" checked={!!f.importada} onChange={(e) => m("importada", e.target.checked ? "1" : "")} />
+            Compra importada em euros (ex.: Granvelada) — o sistema calcula o custo em Kz com câmbio, IVA e frete</label>
+          {f.importada && <>
+            <div><label className="rotulo" htmlFor="mv-eur">Valor da factura (€) *</label><input id="mv-eur" type="number" min={0} step="any" className="campo" value={f.valor_eur} onChange={(e) => m("valor_eur", e.target.value)} /></div>
+            <div><label className="rotulo" htmlFor="mv-kg">Peso para o frete (kg)</label><input id="mv-kg" type="number" min={0} step="any" className="campo" value={f.peso_kg} onChange={(e) => m("peso_kg", e.target.value)} /></div>
+            {pode("stock.ver_valor") && <>
+              <div><label className="rotulo">Câmbio (Kz/€) — vazio = Definições</label><input type="number" min={0} step="any" className="campo" value={f.cambio} onChange={(e) => m("cambio", e.target.value)} /></div>
+              <div><label className="rotulo">IVA (%) — vazio = Definições</label><input type="number" min={0} step="any" className="campo" value={f.iva} onChange={(e) => m("iva", e.target.value)} /></div>
+              <div><label className="rotulo">Frete (Kz/kg) — vazio = Definições</label><input type="number" min={0} step="any" className="campo" value={f.frete} onChange={(e) => m("frete", e.target.value)} /></div>
+            </>}
+          </>}
         </>}
         {accao.tipo !== "inventario" && <>
           <div><label className="rotulo">Data</label><input type="date" className="campo" max={hojeIso()} value={f.data_movimento} onChange={(e) => m("data_movimento", e.target.value)} /></div>
@@ -472,4 +496,60 @@ export function Rastreabilidade({ id, aoFechar }: { id: string; aoFechar: () => 
 
 function Info({ r, v }: { r: string; v: string }) {
   return <div><dt className="text-xs text-terra-700">{r}</dt><dd className="font-medium">{v}</dd></div>;
+}
+
+
+/** Melhoria nº 9 — composição de um kit: componentes fixos e «à escolha» (a cliente escolhe na venda). Só a CEO altera. */
+function ComposicaoKit({ kit, aoMudar, aoEditar }: { kit: Artigo; aoMudar: () => void; aoEditar?: () => void }) {
+  const { pode } = useAuth();
+  const toast = useToast();
+  const ceo = pode("precos.alterar");
+  const produtos = useDados(() => api.get<Artigo[]>("/stock/artigos")).dados?.filter((a) => a.categoria === "produto_acabado" || a.categoria === "embalagem") ?? [];
+  const nome = (id: string) => limpa(produtos.find((p) => p.id === id)?.nome ?? "?");
+  const [editar, setEditar] = useState(false);
+  const [linhas, setLinhas] = useState<{ descricao: string; quantidade: string; fixo: string; opcoes: string[] }[]>([]);
+  const comecar = () => {
+    setLinhas((kit.componentes ?? []).map((c) => ({ descricao: c.descricao, quantidade: String(Number(c.quantidade)), fixo: c.artigo?.id ?? "", opcoes: c.opcoes ?? [] })));
+    if (!kit.componentes?.length) setLinhas([{ descricao: "", quantidade: "1", fixo: "", opcoes: [] }]);
+    setEditar(true);
+  };
+  const guardar = async () => {
+    try {
+      await api.put(`/stock/artigos/${kit.id}/componentes`, linhas.map((l) => ({ descricao: l.descricao, quantidade: l.quantidade,
+        artigo_id: l.fixo || null, opcoes: l.fixo ? null : l.opcoes })));
+      toast("Composição do kit guardada."); setEditar(false); aoMudar();
+    } catch (e) { toast(mensagemErro(e), "erro"); }
+  };
+  const mudar = (i: number, k: string, v: unknown) => setLinhas(linhas.map((x, n) => (n === i ? { ...x, [k]: v } : x)));
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-serif text-lg">Composição do kit{kit.kit_limite ? ` · limitado a ${Number(kit.kit_limite)}` : ""}</h3>
+        <div className="flex gap-2">{aoEditar && <button className="btn-fantasma" onClick={aoEditar}>Editar artigo</button>}
+          {ceo && !editar && <button className="btn-secundario" onClick={comecar}>Definir composição</button>}</div>
+      </div>
+      {!editar ? (!kit.componentes?.length ? <p className="text-terra-700">Ainda sem composição: não pode ser vendido.</p> :
+        <ul className="list-disc pl-5">{kit.componentes.map((c) => <li key={c.id}>{Number(c.quantidade)} × {c.artigo ? limpa(c.artigo.nome) :
+          <>{c.descricao} <span className="text-terra-700">(à escolha: {(c.opcoes ?? []).map(nome).join(", ")})</span></>}</li>)}</ul>) : (
+        <div className="space-y-3">
+          {linhas.map((l, i) => (
+            <div key={i} className="rounded-xl border border-linho bg-white p-3 grid sm:grid-cols-[1fr_6rem] gap-2">
+              <input className="campo" placeholder="Descrição (ex.: Sabonete à escolha)" value={l.descricao} onChange={(e) => mudar(i, "descricao", e.target.value)} />
+              <input className="campo" type="number" min={1} step="any" aria-label="Quantidade" value={l.quantidade} onChange={(e) => mudar(i, "quantidade", e.target.value)} />
+              <select className="campo sm:col-span-2" aria-label="Produto" value={l.fixo} onChange={(e) => mudar(i, "fixo", e.target.value)}>
+                <option value="">À escolha da cliente (marque as opções abaixo)</option>
+                {produtos.map((p) => <option key={p.id} value={p.id}>Sempre: {limpa(p.nome)}</option>)}
+              </select>
+              {!l.fixo && <div className="sm:col-span-2 flex flex-wrap gap-3">{produtos.filter((p) => p.categoria === "produto_acabado").map((p) => (
+                <label key={p.id} className="flex items-center gap-1"><input type="checkbox" className="accent-folha-600" checked={l.opcoes.includes(p.id)}
+                  onChange={(e) => mudar(i, "opcoes", e.target.checked ? [...l.opcoes, p.id] : l.opcoes.filter((x) => x !== p.id))} />{limpa(p.nome)}</label>))}</div>}
+              <button className="btn-fantasma text-alerta justify-self-start" onClick={() => setLinhas(linhas.filter((_, n) => n !== i))}>Remover</button>
+            </div>
+          ))}
+          <div className="flex justify-between"><button className="btn-fantasma" onClick={() => setLinhas([...linhas, { descricao: "", quantidade: "1", fixo: "", opcoes: [] }])}>+ Componente</button>
+            <div className="flex gap-2"><button className="btn-secundario" onClick={() => setEditar(false)}>Cancelar</button><button className="btn-primario" onClick={guardar}>Guardar composição</button></div></div>
+        </div>
+      )}
+    </div>
+  );
 }

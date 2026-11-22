@@ -22,7 +22,7 @@ from app.modules.stock.models import Artigo, Fornecedor, Lote, Movimento
 
 router = APIRouter(prefix="/stock", tags=["Stock"])
 
-Categoria = Literal["materia_prima", "embalagem", "produto_acabado"]
+Categoria = Literal["materia_prima", "embalagem", "produto_acabado", "intermedio", "kit"]
 Unidade = Literal["g", "kg", "ml", "l", "un"]
 Quantidade = Field(gt=0, max_digits=14, decimal_places=3)
 
@@ -98,6 +98,17 @@ class ArtigoIn(BaseModel):
     descricao: str | None = Field(default=None, max_length=3000)
     activo: bool = True
     custo_unitario: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=4)
+    margem_alvo_pct: Decimal | None = Field(default=None, ge=0, lt=100, max_digits=5, decimal_places=2)  # excepção (CEO)
+    kit_limite: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=3)
+
+
+def _normalizar(dados: ArtigoIn) -> None:
+    if dados.categoria in ("produto_acabado", "intermedio") and not dados.controla_lotes:
+        raise ErroNegocio("lotes_obrigatorios", "Produtos acabados e intermédios têm sempre controlo de lotes (rastreabilidade).")
+    if dados.categoria == "kit":
+        dados.controla_lotes, dados.stock_minimo, dados.unidade = False, Decimal(0), "un"
+    else:
+        dados.kit_limite = None
 
 
 def artigo_saida(ctx: Contexto, a: Artigo, saldo: Decimal, datas: tuple | None = None) -> dict:
@@ -111,6 +122,11 @@ def artigo_saida(ctx: Contexto, a: Artigo, saldo: Decimal, datas: tuple | None =
         "ultima_entrada": entrada, "ultima_saida": saida,
         "custo_unitario": (None if a.custo_unitario is None else str(a.custo_unitario)) if v else None,
         "valor_stock": (_dinheiro(saldo * a.custo_unitario) if a.custo_unitario is not None and saldo > 0 else None) if v else None,
+        "margem_alvo_pct": (None if a.margem_alvo_pct is None else str(a.margem_alvo_pct)) if v else None,
+        "kit_limite": None if a.kit_limite is None else str(a.kit_limite),
+        "componentes": [{"id": c.id, "descricao": c.descricao, "quantidade": str(c.quantidade),
+                         "artigo": {"id": c.artigo.id, "nome": c.artigo.nome} if c.artigo else None, "opcoes": c.opcoes}
+                        for c in a.componentes] if a.categoria == "kit" else None,
     }
 
 
@@ -137,10 +153,9 @@ def artigos(categoria: Categoria | None = None, pesquisa: str | None = Query(def
 def criar_artigo(dados: ArtigoIn, ctx: Contexto = Depends(requer(P.STOCK_MOVIMENTAR)), db: Session = Depends(get_db)):
     if db.scalar(select(Artigo).where(func.lower(Artigo.codigo) == dados.codigo.lower())):
         raise conflito("Já existe um artigo com esse código.")
-    if dados.custo_unitario is not None and not _valor(ctx):
-        raise proibido("Só a CEO define custos.")
-    if dados.categoria == "produto_acabado" and not dados.controla_lotes:
-        raise ErroNegocio("lotes_obrigatorios", "Produtos acabados têm sempre controlo de lotes (rastreabilidade).")
+    if (dados.custo_unitario is not None or dados.margem_alvo_pct is not None) and not _valor(ctx):
+        raise proibido("Só a CEO define custos e margens.")
+    _normalizar(dados)
     a = Artigo(**dados.model_dump())
     db.add(a)
     db.flush()
@@ -156,9 +171,11 @@ def editar_artigo(aid: UUID, dados: ArtigoIn, ctx: Contexto = Depends(requer(P.S
     a = db.get(Artigo, aid)
     if a is None:
         raise nao_encontrado("Artigo")
+    _normalizar(dados)
     novos = dados.model_dump()
     if not _valor(ctx):
         novos.pop("custo_unitario")  # colaboradoras não vêem nem alteram custos
+        novos.pop("margem_alvo_pct")
     if novos["codigo"].lower() != a.codigo.lower() and db.scalar(select(Artigo).where(func.lower(Artigo.codigo) == novos["codigo"].lower())):
         raise conflito("Já existe um artigo com esse código.")
     usado = db.scalar(select(func.count()).where(Movimento.artigo_id == a.id))
@@ -173,6 +190,42 @@ def editar_artigo(aid: UUID, dados: ArtigoIn, ctx: Contexto = Depends(requer(P.S
     db.commit()
     db.refresh(a)
     return artigo_saida(ctx, a, svc.saldo(db, a.id))
+
+
+class ComponenteIn(BaseModel):
+    descricao: str = Field(min_length=2, max_length=120)
+    quantidade: Decimal = Quantidade
+    artigo_id: UUID | None = None          # componente fixo
+    opcoes: list[UUID] | None = Field(default=None, max_length=40)  # ou «à escolha» entre estes
+
+
+@router.put("/artigos/{aid}/componentes")
+def definir_componentes(aid: UUID, componentes: list[ComponenteIn], ctx: Contexto = Depends(requer(P.PRECOS_ALTERAR)),
+                        db: Session = Depends(get_db)):
+    """Melhoria nº 9: composição de um kit (componentes fixos e «à escolha» na venda). Só a CEO."""
+    from app.modules.stock.models import ComponenteKit
+    a = db.get(Artigo, aid)
+    if a is None or a.categoria != "kit":
+        raise ErroNegocio("nao_e_kit", "Só os artigos do tipo «Kit» têm composição.")
+    if not componentes:
+        raise ErroNegocio("sem_componentes", "Um kit precisa de pelo menos um componente.")
+    a.componentes.clear()
+    db.flush()
+    for n, c in enumerate(componentes):
+        if (c.artigo_id is None) == (not c.opcoes):
+            raise ErroNegocio("componente_invalido", f"«{c.descricao}»: indique um produto fixo ou as opções à escolha.")
+        ids = [c.artigo_id] if c.artigo_id else list(dict.fromkeys(c.opcoes))
+        for i in ids:
+            x = db.get(Artigo, i)
+            if x is None or x.categoria not in ("produto_acabado", "embalagem") or not x.activo:
+                raise ErroNegocio("componente_invalido", "Os componentes de um kit são produtos acabados ou embalagens activos.")
+        a.componentes.append(ComponenteKit(descricao=c.descricao.strip(), quantidade=svc.q3(c.quantidade), ordem=n,
+                                           artigo_id=c.artigo_id, opcoes=None if c.artigo_id else [str(i) for i in ids]))
+    registar(db, utilizador_id=ctx.utilizador.id, accao="actualizar", entidade="artigo", entidade_id=a.id,
+             resumo=f"Definiu a composição do kit {a.codigo} ({len(componentes)} componente(s))", ip=ctx.ip)
+    db.commit()
+    db.refresh(a)
+    return artigo_saida(ctx, a, Decimal(0))
 
 
 @router.get("/artigos/{aid}")
@@ -225,6 +278,31 @@ class EntradaIn(BaseModel):
     data_movimento: date | None = None
     referencia: str | None = Field(default=None, max_length=80)
     motivo: str | None = Field(default=None, max_length=1000)
+    importacao: "ImportacaoIn | None" = None
+
+
+class ImportacaoIn(BaseModel):
+    """Melhoria nº 7: compra importada (ex.: Granvelada). Custo em Kz por unidade =
+    (valor em euros × câmbio × (1 + IVA)) + frete por kg × peso) ÷ quantidade."""
+    valor_eur: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    peso_kg: Decimal = Field(ge=0, max_digits=10, decimal_places=3)
+    cambio_kz_eur: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=4)  # vazio = Definições
+    iva_pct: Decimal | None = Field(default=None, ge=0, le=100, max_digits=5, decimal_places=2)
+    frete_kz_kg: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+
+
+def custo_importacao(db: Session, imp: ImportacaoIn, quantidade: Decimal) -> tuple[Decimal, str]:
+    from app.modules.configuracao import service as config
+    cambio = imp.cambio_kz_eur or (Decimal(str(config.obter(db, "cambio_kz_eur"))) if config.obter(db, "cambio_kz_eur") else None)
+    if cambio is None:
+        raise ErroNegocio("cambio_em_falta", "Indique o câmbio (ou defina-o em Definições).")
+    iva = imp.iva_pct if imp.iva_pct is not None else Decimal(str(config.obter(db, "iva_importacao_pct") or 0))
+    frete = imp.frete_kz_kg if imp.frete_kz_kg is not None else Decimal(str(config.obter(db, "frete_importacao_kz_kg") or 0))
+    total = imp.valor_eur * cambio * (1 + iva / 100) + frete * imp.peso_kg
+    unit = (total / quantidade).quantize(Decimal("0.0001"))
+    nota = (f"Importação: {imp.valor_eur} € × {cambio} Kz/€ + IVA {iva}% + frete {frete} Kz/kg × {imp.peso_kg} kg "
+            f"= {total.quantize(Decimal('0.01'))} Kz")
+    return unit, nota
 
 
 class SaidaIn(BaseModel):
@@ -255,7 +333,12 @@ def _depois_de_mexer(db: Session, artigo_ids) -> None:
 def entrada(dados: EntradaIn, ctx: Contexto = Depends(requer(P.STOCK_MOVIMENTAR)), db: Session = Depends(get_db)):
     if dados.fornecedor_id and db.get(Fornecedor, dados.fornecedor_id) is None:
         raise ErroNegocio("fornecedor_invalido", "Fornecedor inexistente.")
-    m = svc.registar_entrada(db, ctx, dados.artigo_id, svc.DadosEntrada(**dados.model_dump(exclude={"artigo_id"})))
+    if dados.importacao is not None:
+        dados.custo_unitario, nota = custo_importacao(db, dados.importacao, dados.quantidade)
+        if not _valor(ctx):
+            nota = f"Importação: {dados.importacao.valor_eur} € (custo em Kz calculado pelo sistema)"
+        dados.motivo = f"{dados.motivo}. {nota}" if dados.motivo else nota
+    m = svc.registar_entrada(db, ctx, dados.artigo_id, svc.DadosEntrada(**dados.model_dump(exclude={"artigo_id", "importacao"})))
     db.commit()
     return movimento_saida(ctx, m)
 
@@ -362,3 +445,6 @@ def relatorios(ctx: Contexto = Depends(requer(P.STOCK_VER)), db: Session = Depen
         saida["valor_inventario"] = {"total": _dinheiro(valor), "por_categoria": {k: _dinheiro(v) for k, v in por_cat.items()},
                                      "artigos_sem_custo": sem_custo, "moeda": "AOA"}
     return saida
+
+
+EntradaIn.model_rebuild()

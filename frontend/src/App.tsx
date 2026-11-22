@@ -5,6 +5,7 @@ import { Carregando } from "./components/ui";
 import Agenda from "./pages/Agenda";
 import Assistente from "./pages/Assistente";
 import Auditoria from "./pages/Auditoria";
+import Catalogo from "./pages/Catalogo";
 import Ausencias from "./pages/Ausencias";
 import Automacoes from "./pages/Automacoes";
 import Definicoes from "./pages/Definicoes";
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="definicoes" element={<Definicoes />} />
         <Route path="assistente" element={<Assistente />} />
         <Route path="agenda" element={<Agenda />} />
+        <Route path="catalogo" element={<Protegida permissao="vendas.gerir"><Catalogo /></Protegida>} />
         <Route path="a-minha-funcao" element={<MinhaFuncao />} />
         <Route path="ausencias" element={<Ausencias />} />
         <Route path="relatorio" element={<Protegida permissao="financas.ver"><RelatorioMensal /></Protegida>} />

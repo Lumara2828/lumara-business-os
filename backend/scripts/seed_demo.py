@@ -58,6 +58,7 @@ def limpar(db):
     db.execute(text("DELETE FROM ordens_producao WHERE is_demo"))
     db.execute(text("DELETE FROM ficha_ingredientes WHERE ficha_id IN (SELECT id FROM fichas_tecnicas WHERE is_demo)"))
     db.execute(text("DELETE FROM fichas_tecnicas WHERE is_demo"))
+    db.execute(text("DELETE FROM componentes_kit WHERE kit_id IN (SELECT id FROM artigos WHERE is_demo)"))
     db.execute(text("DELETE FROM artigos WHERE is_demo"))
     db.execute(text("DELETE FROM fornecedores WHERE is_demo"))
     db.execute(text("DELETE FROM conteudos WHERE is_demo"))
@@ -92,6 +93,7 @@ def semear(db):
         if diana and luisa:
             semear_instrucoes(db, diana, luisa)
             semear_funcoes(db)
+            semear_kits_intermedios(db, luisa)
             db.commit()
         print("Os dados DEMO já existem. Use --limpar para os remover primeiro.")
         return
@@ -392,11 +394,49 @@ def semear_financas_procedimentos(db, maira, diana, luisa):
                             aprovado_por_id=luisa.id, aprovado_em=agora(), is_demo=True))
     semear_instrucoes(db, diana, luisa)
     semear_funcoes(db)
+    semear_kits_intermedios(db, luisa)
     cat = db.scalar(select(CategoriaFinanceira).where(CategoriaFinanceira.nome == "Embalagens e rótulos"))
     if cat:
         db.add(Lancamento(tipo="despesa", categoria_id=cat.id, descricao="[DEMO] Frascos âmbar de 30 ml (valor fictício)", valor_kz=D("10000"),
                           data_competencia=hoje(), estado="proposta", proposto_por_id=diana.id, is_demo=True,
                           justificacao="Stock abaixo do mínimo — valor fictício de demonstração."))
+    db.flush()
+
+
+def semear_kits_intermedios(db, luisa):
+    """Melhorias nº 8 e 9 — um produto intermédio (base) e um kit com componente à escolha, para testar.
+    Idempotente: entra também numa base DEMO já existente."""
+    from decimal import Decimal as D
+    from app.modules.producao.models import FichaIngrediente, FichaTecnica
+    from app.modules.stock.models import Artigo, ComponenteKit
+    from app.modules.vendas.models import Preco
+
+    if db.scalar(select(Artigo).where(Artigo.codigo == "DEMO-KIT-MAOS")):
+        return
+    art = {a.codigo: a for a in db.scalars(select(Artigo).where(Artigo.is_demo.is_(True)))}
+    unhas, corpo = art.get("DEMO-PA-UNHAS30"), art.get("DEMO-PA-CORPO100")
+    coco, ricino = art.get("DEMO-MP-COCO"), art.get("DEMO-MP-RICINO")
+    if not (unhas and corpo and coco and ricino):
+        return
+    base = Artigo(codigo="DEMO-INT-BASE", nome="[DEMO] Base de óleos coco e rícino", categoria="intermedio", unidade="ml",
+                  stock_minimo=D(500), controla_lotes=True, is_demo=True,
+                  descricao="Produto intermédio: produzido pela Diana e usado como ingrediente noutras fichas.")
+    kit = Artigo(codigo="DEMO-KIT-MAOS", nome="[DEMO] Kit cuidado das mãos", categoria="kit", unidade="un",
+                 stock_minimo=D(0), controla_lotes=False, kit_limite=D(10), is_demo=True,
+                 descricao="Óleo de unhas e um óleo à escolha da cliente, em saquinho de oferta.")
+    db.add_all([base, kit])
+    db.flush()
+    ficha = FichaTecnica(codigo="DEMO-FT-BASE", versao=1, produto_id=base.id, nome="[DEMO] Base de óleos coco e rícino",
+                         rendimento=D(1000), tempo_producao_min=30, validade_dias=180, is_demo=True,
+                         instrucoes="1. Higienizar bancada e utensílios.\n2. Pesar os óleos.\n3. Misturar e guardar em frasco rotulado com lote.")
+    ficha.ingredientes = [FichaIngrediente(artigo_id=coco.id, quantidade=D(500), ordem=0),
+                          FichaIngrediente(artigo_id=ricino.id, quantidade=D(500), ordem=1)]
+    db.add(ficha)
+    db.add_all([ComponenteKit(kit_id=kit.id, ordem=0, descricao="Óleo fortalecedor de unhas", quantidade=D(1), artigo_id=unhas.id),
+                ComponenteKit(kit_id=kit.id, ordem=1, descricao="Óleo à escolha", quantidade=D(1),
+                              opcoes=[str(unhas.id), str(corpo.id)])])
+    db.add(Preco(artigo_id=kit.id, preco_kz=D(10500), vigente_desde=hoje(), definido_por_id=luisa.id, is_demo=True,
+                 motivo="[DEMO] Preço fictício de demonstração — substituir pelo preço real"))
     db.flush()
 
 

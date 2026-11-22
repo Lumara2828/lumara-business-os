@@ -124,7 +124,7 @@ def o_que_produzir(db: Session, ctx: Contexto) -> Resultado:
     from app.modules.stock.models import Artigo
     from app.modules.vendas.models import Encomenda, LinhaEncomenda
 
-    produtos = db.scalars(select(Artigo).where(Artigo.categoria == "produto_acabado", Artigo.activo.is_(True)).order_by(Artigo.nome)).unique().all()
+    produtos = db.scalars(select(Artigo).where(Artigo.categoria.in_(("produto_acabado", "intermedio")), Artigo.activo.is_(True)).order_by(Artigo.nome)).unique().all()
     saldos = stock.saldos(db, [a.id for a in produtos])
     encomendado = dict(db.execute(
         select(LinhaEncomenda.artigo_id, func.sum(LinhaEncomenda.quantidade)).join(Encomenda)

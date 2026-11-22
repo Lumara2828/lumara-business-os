@@ -217,3 +217,122 @@ def test_agenda_de_reunioes(equipa, db, monkeypatch):
     c = luisa.post(f"/reunioes/{seguinte['id']}/cancelar", {"motivo": "Feira", "toda_a_serie": True}).json()
     assert c["estado"] == "cancelada"
     assert sum(1 for x in diana.get("/reunioes").json() if x["estado"] == "cancelada") == 3
+
+
+# --- Bloco 5: intermédios (nº 8), kits (nº 9), preço sugerido (nº 10), importação (nº 7) --------
+
+def test_produto_intermedio_e_custo_que_passa(equipa):
+    from decimal import Decimal as D
+    from tests.test_stock_producao import _entrada
+    luisa, _, diana = equipa
+    mk = lambda **k: diana.post("/stock/artigos", k).json()  # noqa: E731
+    glic = mk(codigo="MP-GLIC", nome="Glicerina", categoria="materia_prima", unidade="g", stock_minimo="0")
+    base = mk(codigo="BG", nome="Base glicerinada", categoria="intermedio", unidade="g", stock_minimo="1000")
+    sab = mk(codigo="SAB-001", nome="Sabonete de lavanda", categoria="produto_acabado", unidade="un", stock_minimo="0")
+    assert diana.post("/stock/artigos", {"codigo": "X", "nome": "Sem lotes", "categoria": "intermedio", "unidade": "g",
+                                         "stock_minimo": "0", "controla_lotes": False}).json()["codigo"] == "lotes_obrigatorios"
+    _entrada(luisa, glic, 5000, custo_unitario="10", lote_numero="G1", validade=(hoje() + timedelta(days=300)).isoformat())
+    # Base glicerinada: 1000 g de glicerina dão 1000 g de base.
+    fb = diana.post("/producao/fichas", {"codigo": "FT-BG", "nome": "Base glicerinada", "produto_id": base["id"], "rendimento": "1000",
+                                         "validade_dias": 180, "ingredientes": [{"artigo_id": glic["id"], "quantidade": "1000"}]})
+    assert fb.status_code == 201, fb.text
+    # Sabonete usa a base como ingrediente (100 g por unidade); um produto acabado não pode ser ingrediente.
+    fs = diana.post("/producao/fichas", {"codigo": "FT-SAB", "nome": "Sabonete", "produto_id": sab["id"], "rendimento": "10",
+                                         "ingredientes": [{"artigo_id": base["id"], "quantidade": "1000"}]})
+    assert fs.status_code == 201, fs.text
+    assert diana.post("/producao/fichas", {"codigo": "FT-XX", "nome": "Base inválida", "produto_id": base["id"], "rendimento": "1",
+                                           "ingredientes": [{"artigo_id": sab["id"], "quantidade": "1"}]}).json()["codigo"] == "ingrediente_invalido"
+    # Produzir a base: aparece em «o que produzir» (abaixo do mínimo), e o custo passa para o artigo.
+    assert any(l[0] == "Base glicerinada" for l in diana.get("/assistente/consultas/o_que_produzir").json()["resultado"]["linhas"])
+    o = diana.post("/producao/ordens", {"ficha_id": fb.json()["id"], "quantidade_planeada": "2000", "data_inicio": hoje().isoformat(),
+                                        "data_prevista": hoje().isoformat(), "criar_tarefa": False}).json()
+    diana.post(f"/producao/ordens/{o['id']}/iniciar")
+    assert diana.post(f"/producao/ordens/{o['id']}/concluir", {"quantidade_produzida": "2000"}).status_code == 200
+    assert D(luisa.get(f"/stock/artigos/{base['id']}").json()["custo_unitario"]) == D("10")
+    # O sabonete consome a base e herda o custo: 100 g × 10 Kz = 1000 Kz por unidade.
+    o2 = diana.post("/producao/ordens", {"ficha_id": fs.json()["id"], "quantidade_planeada": "10", "data_inicio": hoje().isoformat(),
+                                         "data_prevista": hoje().isoformat(), "criar_tarefa": False}).json()
+    diana.post(f"/producao/ordens/{o2['id']}/iniciar")
+    diana.post(f"/producao/ordens/{o2['id']}/concluir", {"quantidade_produzida": "10"})
+    assert D(luisa.get(f"/stock/artigos/{sab['id']}").json()["custo_unitario"]) == D("1000")
+    assert D(diana.get(f"/stock/artigos/{base['id']}").json()["disponivel"]) == D("1000")
+
+
+def test_preco_sugerido_e_mao_obra_por_lote(equipa, catalogo):
+    from tests.test_stock_producao import _entrada
+    luisa, maira, diana = equipa
+    _entrada(luisa, catalogo["oleo"], 1000, custo_unitario="2")   # 300 ml por 10 un. → 60 Kz/un.
+    _entrada(luisa, catalogo["frasco"], 100, custo_unitario="40")  # 1 frasco por un. → 40 Kz/un.
+    fid = catalogo["ficha"]["id"]
+    p = next(x for x in luisa.get("/financas/custos-produtos").json()["produtos"] if x["ficha_id"] == fid)
+    assert p["preco_sugerido_kz"] is None and not p["completo"]  # falta a mão-de-obra
+    assert luisa.put(f"/financas/custos-produtos/{fid}", {"mao_obra_lote_kz": "1000"}).status_code == 200  # 100 Kz/un.
+    p = next(x for x in luisa.get("/financas/custos-produtos").json()["produtos"] if x["ficha_id"] == fid)
+    assert p["custo_total_kz"] == "200.00" and p["margem_alvo_pct"] == "50" and p["preco_sugerido_kz"] == "400"
+    # Excepção por produto (CEO): margem-alvo de 60% → 500 Kz.
+    prod = catalogo["produto"]
+    corpo = {k: prod[k] for k in ("codigo", "nome", "categoria", "unidade", "stock_minimo")}
+    luisa.put(f"/stock/artigos/{prod['id']}", {**corpo, "margem_alvo_pct": "60"})
+    p = next(x for x in luisa.get("/financas/custos-produtos").json()["produtos"] if x["ficha_id"] == fid)
+    assert p["margem_alvo_propria"] and p["preco_sugerido_kz"] == "500"
+    assert maira.put("/configuracao/margem_alvo_pct", {"valor": 40}).status_code == 403
+    assert "margem_alvo_pct" not in {c["chave"] for c in diana.get("/configuracao").json()}
+
+
+def test_custo_de_importacao(equipa, catalogo):
+    from decimal import Decimal as D
+    luisa, _, diana = equipa
+    assert luisa.put("/configuracao/cambio_kz_eur", {"valor": 1300}).status_code == 200
+    luisa.put("/configuracao/iva_importacao_pct", {"valor": 14})
+    luisa.put("/configuracao/frete_importacao_kz_kg", {"valor": 13000})
+    # 250 ml de essência por 20 € e 0,3 kg: 20 × 1300 × 1,14 + 13000 × 0,3 = 33540 Kz → 134,16 Kz/ml
+    r = diana.post("/stock/movimentos/entrada", {"artigo_id": catalogo["oleo"]["id"], "quantidade": "250", "lote_numero": "GV-1",
+                                                 "importacao": {"valor_eur": "20", "peso_kg": "0.3"}})
+    assert r.status_code == 201, r.text
+    assert "Kz" not in r.json()["motivo"].replace("Kz calculado", "")  # a Diana não vê o valor em Kz
+    assert D(luisa.get(f"/stock/artigos/{catalogo['oleo']['id']}").json()["custo_unitario"]) == D("134.16")
+
+
+def test_kits_escolha_na_venda(equipa):
+    from decimal import Decimal as D
+    from tests.test_stock_producao import _entrada
+    luisa, maira, diana = equipa
+    mk = lambda **k: diana.post("/stock/artigos", k).json()  # noqa: E731
+    lav = mk(codigo="SAB-LAV", nome="Sabonete lavanda", categoria="produto_acabado", unidade="un", stock_minimo="0")
+    mel = mk(codigo="SAB-MEL", nome="Sabonete mel", categoria="produto_acabado", unidade="un", stock_minimo="0")
+    oleo = mk(codigo="OL-001", nome="Óleo corporal", categoria="produto_acabado", unidade="un", stock_minimo="0")
+    for a in (lav, mel, oleo):
+        _entrada(luisa, a, 10, custo_unitario="1000", lote_numero=f"L-{a['codigo']}", validade=(hoje() + timedelta(days=200)).isoformat())
+    kit = luisa.post("/stock/artigos", {"codigo": "KIT-DUO", "nome": "Kit Duo", "categoria": "kit", "unidade": "un", "stock_minimo": "5",
+                                        "kit_limite": "3"}).json()
+    assert kit["controla_lotes"] is False and kit["stock_minimo"] == "0.000"
+    assert diana.put(f"/stock/artigos/{kit['id']}/componentes", []).status_code == 403
+    comp = luisa.put(f"/stock/artigos/{kit['id']}/componentes", [
+        {"descricao": "Sabonete à escolha", "quantidade": "2", "opcoes": [lav["id"], mel["id"]]},
+        {"descricao": "Óleo corporal de oferta", "quantidade": "1", "artigo_id": oleo["id"]}])
+    assert comp.status_code == 200, comp.text
+    assert diana.post("/stock/movimentos/entrada", {"artigo_id": kit["id"], "quantidade": "1"}).json()["codigo"] == "kit_sem_stock"
+    luisa.post("/vendas/precos", {"artigo_id": kit["id"], "preco_kz": "6000"})
+    c = maira.post("/vendas/clientes", {"nome": "Cliente Kit", "whatsapp": "923000222"}).json()
+    nova = lambda linhas: maira.post("/vendas/encomendas", {"cliente_id": c["id"], "canal": "whatsapp", "linhas": linhas})  # noqa: E731
+    assert nova([{"artigo_id": kit["id"], "quantidade": "1"}]).json()["codigo"] == "escolhas_em_falta"
+    assert nova([{"artigo_id": kit["id"], "quantidade": "1", "escolhas": [oleo["id"]]}]).json()["codigo"] == "escolha_invalida"
+    e = nova([{"artigo_id": kit["id"], "quantidade": "1", "escolhas": [lav["id"]]},
+              {"artigo_id": kit["id"], "quantidade": "1", "escolhas": [mel["id"]]}]).json()
+    assert e["total_kz"] == "12000.00" and e["linhas"][0]["componentes"][0]["nome"] == "Sabonete lavanda"
+    # Limite de 3 kits no total
+    assert nova([{"artigo_id": kit["id"], "quantidade": "2", "escolhas": [lav["id"]]}]).json()["codigo"] == "kit_esgotado"
+    url = f"/vendas/encomendas/{e['id']}"
+    disp = {d["artigo"]: D(d["necessario"]) for d in maira.get(url).json()["disponibilidade"]}
+    assert disp == {"Sabonete lavanda": 2, "Sabonete mel": 2, "Óleo corporal": 2}
+    for est in ("em_preparacao", "pronta", "entregue"):
+        assert diana.post(f"{url}/estado", {"estado": est}).json()["estado"] == est
+    saldo = lambda a: D(diana.get(f"/stock/artigos/{a['id']}").json()["disponivel"])  # noqa: E731
+    assert (saldo(lav), saldo(mel), saldo(oleo)) == (8, 8, 8)
+    # Custo do kit (do mais barato ao mais caro) e preço sugerido
+    k = next(x for x in luisa.get("/financas/custos-produtos").json()["kits"] if x["kit"]["codigo"] == "KIT-DUO")
+    assert k["custo_min_kz"] == "3000.00" and k["completo"] and k["preco_sugerido_kz"] == "6000"
+    # Devolução de 1 kit: os componentes voltam aos lotes de onde saíram
+    r = maira.post(f"{url}/devolucoes", {"itens": [{"artigo_id": kit["id"], "quantidade": "1", "repor_stock": True}], "motivo": "Oferta repetida"})
+    assert r.status_code == 201, r.text
+    assert (saldo(lav), saldo(mel), saldo(oleo)) == (10, 8, 9)
