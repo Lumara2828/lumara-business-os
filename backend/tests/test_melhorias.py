@@ -359,3 +359,33 @@ def test_pilares_de_conteudo_e_aviso_de_mix(equipa):
     assert any(a.startswith("Autoridade") and "abaixo" in a for a in m["avisos"])
     assert not any(a.startswith("Vendas") for a in m["avisos"])  # 16,7% vs 10%: dentro da tolerância
     assert diana.get("/marketing/pilares", params={"ano": d.year, "mes": d.month}).status_code == 403
+
+
+def test_pedidos_entre_colegas(equipa):
+    luisa, maira, diana = equipa
+    prazo = (hoje() + timedelta(days=4)).isoformat()
+    t = maira.post("/tarefas", {"titulo": "Fotografar os kits de Natal", "responsavel_id": diana.id, "prazo": prazo}).json()
+    assert t["pedido_estado"] == "pendente" and t["permissoes"]["responder_pedido"] is False  # quem pede não responde
+    vista = diana.get(f"/tarefas/{t['id']}").json()
+    assert vista["permissoes"]["responder_pedido"] is True
+    assert any(n["titulo"].startswith("Pedido de Maira") for n in diana.get("/notificacoes").json()["itens"])
+    # Pendente: não se começa sem aceitar.
+    r = diana.post(f"/tarefas/{t['id']}/estado", {"estado": "em_andamento"})
+    assert r.status_code == 400 and r.json()["codigo"] == "pedido_pendente"
+    # A CEO vê todos os pedidos.
+    assert [x["id"] for x in luisa.get("/tarefas", params={"pedidos": "pendentes"}).json()] == [t["id"]]
+    assert luisa.post(f"/tarefas/{t['id']}/pedido", {"aceitar": True}).status_code == 403
+    assert diana.post(f"/tarefas/{t['id']}/pedido", {"aceitar": False}).json()["codigo"] == "motivo_obrigatorio"
+    ok = diana.post(f"/tarefas/{t['id']}/pedido", {"aceitar": True})
+    assert ok.status_code == 200 and ok.json()["pedido_estado"] == "aceite"
+    assert diana.post(f"/tarefas/{t['id']}/estado", {"estado": "em_andamento"}).status_code == 200
+    assert diana.post(f"/tarefas/{t['id']}/pedido", {"aceitar": True}).json()["codigo"] == "estado_invalido"
+    # Recusa: volta para quem pediu, com o motivo, e a CEO é avisada.
+    t2 = maira.post("/tarefas", {"titulo": "Rotular 200 frascos", "responsavel_id": diana.id, "prazo": prazo}).json()
+    r = diana.post(f"/tarefas/{t2['id']}/pedido", {"aceitar": False, "motivo": "Produção cheia até sexta."}).json()
+    assert r["pedido_estado"] == "recusado" and r["responsavel"]["id"] == maira.id
+    assert any(c["texto"] == "Pedido recusado: Produção cheia até sexta." for c in maira.get(f"/tarefas/{t2['id']}/comentarios").json())
+    assert any(n["titulo"] == "Pedido recusado: Rotular 200 frascos" for n in luisa.get("/notificacoes").json()["itens"])
+    assert diana.get(f"/tarefas/{t2['id']}").status_code == 404  # já não é dela
+    # A CEO continua a atribuir directamente, sem pedido.
+    assert luisa.post("/tarefas", {"titulo": "Inventário", "responsavel_id": diana.id, "prazo": prazo}).json()["pedido_estado"] is None

@@ -22,7 +22,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [historico, setHistorico] = useState<Historico[]>([]);
   const [texto, setTexto] = useState("");
-  const [pedido, setPedido] = useState<{ estado: Estado | "rejeitar" | "aprovar"; titulo: string; obrigatorio: boolean } | null>(null);
+  const [pedido, setPedido] = useState<{ estado: Estado | "rejeitar" | "aprovar" | "aceitar_pedido" | "recusar_pedido"; titulo: string; obrigatorio: boolean } | null>(null);
   const [motivo, setMotivo] = useState("");
   const [editar, setEditar] = useState(false);
   const [ocupado, setOcupado] = useState(false);
@@ -62,6 +62,10 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
   const confirmarPedido = () => {
     if (!t || !pedido) return;
     if (pedido.obrigatorio && !motivo.trim()) return toast("Este campo é obrigatório.", "erro");
+    if (pedido.estado === "aceitar_pedido" || pedido.estado === "recusar_pedido") {
+      const aceitar = pedido.estado === "aceitar_pedido";
+      return executar(() => api.post(`/tarefas/${t.id}/pedido`, { aceitar, motivo: motivo || null }), aceitar ? "Pedido aceite." : "Pedido recusado; a tarefa voltou para quem pediu.");
+    }
     if (pedido.estado === "aprovar") return executar(() => api.post(`/tarefas/${t.id}/aprovar`, { comentario: motivo || null }), "Trabalho aprovado.");
     if (pedido.estado === "rejeitar") return executar(() => api.post(`/tarefas/${t.id}/rejeitar`, { comentario: motivo }), "Tarefa devolvida para correcção.");
     executar(() => api.post(`/tarefas/${t.id}/estado`, { estado: pedido.estado, comentario: motivo || null, versao: t.versao }), "Estado actualizado.");
@@ -106,6 +110,9 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
             <EstadoBadge estado={t.estado} /><PrioridadeBadge prioridade={t.prioridade} />
             {t.em_atraso && <span className="rounded-full bg-alerta/10 text-alerta px-2 py-0.5 text-xs font-medium">{t.dias_atraso} dia(s) em atraso</span>}
             {t.requer_aprovacao && <span className="rounded-full bg-amber-50 text-aviso px-2 py-0.5 text-xs">Requer aprovação</span>}
+            {t.pedido_estado === "pendente" && <span className="rounded-full bg-amber-50 text-aviso px-2 py-0.5 text-xs font-medium">Pedido de {t.criado_por.nome} — por responder</span>}
+            {t.pedido_estado === "aceite" && <span className="rounded-full bg-folha-50 text-folha-700 px-2 py-0.5 text-xs">Pedido aceite</span>}
+            {t.pedido_estado === "recusado" && <span className="rounded-full bg-red-50 text-alerta px-2 py-0.5 text-xs">Pedido recusado</span>}
             {t.actividade_recorrente_id && <span className="rounded-full bg-folha-50 text-folha-700 px-2 py-0.5 text-xs">Recorrente</span>}
             <Demo ativo={t.is_demo} />
           </div>
@@ -123,6 +130,15 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
           </dl>
           {t.descricao && <p className="text-sm whitespace-pre-wrap bg-white rounded-xl border border-linho p-3">{t.descricao}</p>}
           {t.resultado_esperado && <p className="text-sm"><span className="text-terra-700">Resultado esperado:</span> {t.resultado_esperado}</p>}
+          {t.permissoes.responder_pedido && (
+            <div className="rounded-xl border border-aviso/30 bg-amber-50 p-3 text-sm space-y-2">
+              <p><b>{t.criado_por.nome}</b> pede-lhe esta tarefa até {fData(t.prazo)}. Aceite para começar, ou recuse explicando porquê (a tarefa volta para {t.criado_por.nome} e a CEO é avisada).</p>
+              <div className="flex gap-2">
+                <button className="btn-primario" disabled={ocupado} onClick={() => setPedido({ estado: "aceitar_pedido", titulo: "Aceitar o pedido", obrigatorio: false })}>Aceitar pedido</button>
+                <button className="btn-secundario" disabled={ocupado} onClick={() => setPedido({ estado: "recusar_pedido", titulo: "Recusar o pedido — motivo", obrigatorio: true })}>Recusar</button>
+              </div>
+            </div>
+          )}
           <InstrucoesTarefa key={t.id} tarefaId={t.id} podeAgir={t.permissoes.mudar_estado} aoMudar={() => { aoMudar(); carregar(t.id); }} />
 
           <div className="flex flex-wrap gap-2 border-y border-linho py-3">
@@ -130,7 +146,7 @@ export default function TarefaDetalhe({ id, aoFechar, aoMudar }: Props) {
               <button className="btn-primario" disabled={ocupado} onClick={() => setPedido({ estado: "aprovar", titulo: "Aprovar trabalho", obrigatorio: false })}>Aprovar</button>
               <button className="btn-secundario" disabled={ocupado} onClick={() => setPedido({ estado: "rejeitar", titulo: "Pedir correcções", obrigatorio: true })}>Pedir correcções</button>
             </>}
-            {t.permissoes.mudar_estado && (
+            {t.permissoes.mudar_estado && t.pedido_estado !== "pendente" && (
               <label className="flex items-center gap-2 text-sm">
                 <span className="text-terra-700">Mudar estado:</span>
                 <select className="campo !w-auto" value="" disabled={ocupado} onChange={(e) => e.target.value && mudarEstado(e.target.value as Estado)}>

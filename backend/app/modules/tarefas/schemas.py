@@ -99,6 +99,7 @@ class Permissoes(BaseModel):
     aprovar: bool
     eliminar: bool
     reatribuir: bool
+    responder_pedido: bool = False
 
 
 class TarefaOut(BaseModel):
@@ -123,6 +124,7 @@ class TarefaOut(BaseModel):
     submetida_em: datetime | None
     aprovada_em: datetime | None
     actividade_recorrente_id: UUID | None
+    pedido_estado: str | None = None
     procedimento_ref: str | None = None
     procedimento_codigo: str | None = None
     seguranca_confirmada_em: datetime | None = None

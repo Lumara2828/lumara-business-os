@@ -38,8 +38,10 @@ def test_colaboradora_so_ve_as_suas_tarefas(equipa):
 def test_colaboradora_nao_delega(equipa):
     _, maira, diana = equipa
     prazo = (hoje() + timedelta(days=3)).isoformat()
+    # Melhoria nº 2: pedir a uma colega é permitido, mas fica pendente até ela aceitar (não é uma ordem).
     r = maira.post("/tarefas", {"titulo": "Para a Diana", "responsavel_id": diana.id, "prazo": prazo})
-    assert r.status_code == 403
+    assert r.status_code == 201 and r.json()["pedido_estado"] == "pendente"
+    assert maira.patch(f"/tarefas/{r.json()['id']}", {"responsavel_id": maira.id}).status_code == 403
     r = maira.post("/tarefas", {"titulo": "Para mim", "prazo": prazo})
     assert r.status_code == 201 and r.json()["responsavel"]["id"] == maira.id
 

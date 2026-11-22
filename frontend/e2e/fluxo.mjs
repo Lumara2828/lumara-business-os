@@ -404,6 +404,23 @@ await maira.goto(`${BASE}/marketing`);
 await maira.waitForSelector("text=Pilares de conteúdo em");
 await foto(maira, "43-pilares-calendario");
 
+// --- Melhoria nº 2: pedidos entre colegas ---
+await maira.goto(`${BASE}/tarefas`);
+await maira.click("button:has-text('+ Nova tarefa')");
+await maira.fill("#t-titulo", "E2E: fotografar os kits");
+const optD = await maira.locator("#t-resp option", { hasText: "Diana" }).getAttribute("value");
+await maira.selectOption("#t-resp", optD);
+await maira.waitForSelector("text=Será um pedido");
+await maira.fill("#t-prazo", new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10));
+await maira.click("role=dialog >> button:has-text('Criar')");
+await diana.goto(`${BASE}/tarefas`);
+await diana.click("text=E2E: fotografar os kits");
+await diana.waitForSelector("text=pede-lhe esta tarefa");
+await foto(diana, "44-pedido-colega");
+await diana.click("role=dialog >> button:has-text('Aceitar pedido')");
+await diana.click("role=dialog >> button:has-text('Confirmar')");
+await diana.waitForSelector("text=Pedido aceite.");
+
 await browser.close();
 assert.deepEqual(erros, [], `Erros na consola: ${erros.join("\n")}`);
 console.log("E2E OK");

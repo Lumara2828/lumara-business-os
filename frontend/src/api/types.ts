@@ -19,7 +19,8 @@ export interface Tarefa {
   procedimento_codigo?: string | null; seguranca_confirmada_em?: string | null;
   actividade_recorrente_id: string | null; procedimento_ref: string | null; em_atraso: boolean; dias_atraso: number; concluida_no_prazo: boolean | null;
   n_comentarios: number; n_anexos: number; versao: number; is_demo: boolean;
-  permissoes: { editar: boolean; mudar_estado: boolean; aprovar: boolean; eliminar: boolean; reatribuir: boolean };
+  pedido_estado?: "pendente" | "aceite" | "recusado" | null;
+  permissoes: { editar: boolean; mudar_estado: boolean; aprovar: boolean; eliminar: boolean; reatribuir: boolean; responder_pedido?: boolean };
 }
 
 export interface Comentario { id: string; tipo: string; texto: string; autor: UtilizadorResumo; criado_em: string }

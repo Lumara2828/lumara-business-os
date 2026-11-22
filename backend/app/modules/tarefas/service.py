@@ -72,6 +72,7 @@ def permissoes(ctx: Contexto, t: Tarefa) -> Permissoes:
         aprovar=ctx.pode(P.TAREFAS_APROVAR) and t.estado == "aguardar_aprovacao",
         eliminar=ctx.pode(P.TAREFAS_ELIMINAR),
         reatribuir=ceo,
+        responder_pedido=t.pedido_estado == "pendente" and t.responsavel_id == eu,
     )
 
 
@@ -82,7 +83,7 @@ def para_saida(ctx: Contexto, t: Tarefa, n_comentarios: int = 0, n_anexos: int =
         actualizada_em=t.actualizada_em, data_inicio=t.data_inicio, prazo=t.prazo, prioridade=t.prioridade,
         estado=t.estado, requer_aprovacao=t.requer_aprovacao, motivo_bloqueio=t.motivo_bloqueio,
         resultado_esperado=t.resultado_esperado, concluida_em=t.concluida_em, submetida_em=t.submetida_em,
-        aprovada_em=t.aprovada_em, actividade_recorrente_id=t.actividade_recorrente_id,
+        aprovada_em=t.aprovada_em, actividade_recorrente_id=t.actividade_recorrente_id, pedido_estado=t.pedido_estado,
         procedimento_ref=t.procedimento_codigo or (t.actividade.procedimento_ref if t.actividade else None),
         procedimento_codigo=t.procedimento_codigo, seguranca_confirmada_em=t.seguranca_confirmada_em,
         em_atraso=em_atraso(t), dias_atraso=dias_atraso(t), concluida_no_prazo=concluida_no_prazo(t),
@@ -129,8 +130,12 @@ def obter(db: Session, ctx: Contexto, tarefa_id: UUID, bloquear: bool = False) -
 
 def listar(db: Session, ctx: Contexto, *, responsavel_id=None, estados=None, categoria_id=None, prioridade=None,
            pesquisa=None, prazo_de=None, prazo_ate=None, apenas_atrasadas=False, incluir_concluidas=True,
-           limite=500) -> list[Tarefa]:
+           pedidos: str | None = None, limite=500) -> list[Tarefa]:
     q = consulta_visivel(ctx)
+    if pedidos == "pendentes":
+        q = q.where(Tarefa.pedido_estado == "pendente")
+    elif pedidos == "todos":
+        q = q.where(Tarefa.pedido_estado.is_not(None))
     if responsavel_id:
         q = q.where(Tarefa.responsavel_id == responsavel_id)
     if estados:
@@ -186,16 +191,17 @@ def _validar_categoria(db: Session, categoria_id) -> None:
 def criar(db: Session, ctx: Contexto, dados: TarefaCriar) -> Tarefa:
     eu = ctx.utilizador
     responsavel_id = dados.responsavel_id or eu.id
-    if responsavel_id != eu.id and not ctx.pode(P.TAREFAS_DELEGAR):
-        raise proibido("Só a CEO pode atribuir tarefas a outras pessoas. Crie a tarefa para si.")
     if not ctx.pode(P.TAREFAS_DELEGAR) and not ctx.pode(P.TAREFAS_CRIAR_PROPRIAS):
         raise proibido()
+    # Melhoria nº 2: uma colega pode pedir uma tarefa a outra; fica «pedido pendente» até a colega aceitar ou recusar.
+    pedido = responsavel_id != eu.id and not ctx.pode(P.TAREFAS_DELEGAR)
     if dados.prazo < hoje():
         raise ErroNegocio("prazo_invalido", "O prazo não pode ser anterior a hoje.")
     responsavel = _validar_responsavel(db, responsavel_id)
     _validar_categoria(db, dados.categoria_id)
     dados.procedimento_codigo = _validar_procedimento(db, dados.procedimento_codigo)
-    t = Tarefa(**dados.model_dump(exclude={"responsavel_id"}), responsavel_id=responsavel_id, criado_por_id=eu.id)
+    t = Tarefa(**dados.model_dump(exclude={"responsavel_id"}), responsavel_id=responsavel_id, criado_por_id=eu.id,
+               pedido_estado="pendente" if pedido else None)
     db.add(t)
     db.flush()
     from app.modules.ausencias.service import encaminhar_tarefa
@@ -203,9 +209,14 @@ def criar(db: Session, ctx: Contexto, dados: TarefaCriar) -> Tarefa:
     db.flush()
     db.refresh(t)
     registar(db, utilizador_id=eu.id, accao="criar", entidade="tarefa", entidade_id=t.id,
-             resumo=f"Criou {codigo(t)} «{t.titulo}» para {responsavel.nome} (prazo {formatar_data(t.prazo)})", ip=ctx.ip)
-    notificar(db, t.responsavel_id, "tarefa_atribuida", f"Nova tarefa: {t.titulo}",
-              f"{eu.nome} atribuiu-lhe {codigo(t)} com prazo {formatar_data(t.prazo)}.", ligacao(t), excepto=eu.id)
+             resumo=f"{'Pediu' if pedido else 'Criou'} {codigo(t)} «{t.titulo}» {'a' if pedido else 'para'} {responsavel.nome} "
+                    f"(prazo {formatar_data(t.prazo)})", ip=ctx.ip)
+    if pedido:
+        notificar(db, t.responsavel_id, "pedido_tarefa", f"Pedido de {eu.nome}: {t.titulo}",
+                  f"{eu.nome} pede-lhe {codigo(t)} até {formatar_data(t.prazo)}. Aceite ou recuse (com o motivo).", ligacao(t))
+    else:
+        notificar(db, t.responsavel_id, "tarefa_atribuida", f"Nova tarefa: {t.titulo}",
+                  f"{eu.nome} atribuiu-lhe {codigo(t)} com prazo {formatar_data(t.prazo)}.", ligacao(t), excepto=eu.id)
     db.commit()
     return t
 
@@ -279,6 +290,8 @@ def mudar_estado(db: Session, ctx: Contexto, t: Tarefa, dados: MudarEstado) -> T
     if novo == antigo:
         return t
     ceo = ctx.pode(P.TAREFAS_APROVAR)
+    if t.pedido_estado == "pendente" and not ceo:
+        raise ErroNegocio("pedido_pendente", "Este pedido ainda não foi aceite: aceite-o (ou recuse-o) antes de começar.")
     comentario = (dados.comentario or "").strip()
 
     if antigo == "concluida" and not ceo and t.requer_aprovacao:
@@ -365,6 +378,40 @@ def rejeitar(db: Session, ctx: Contexto, t: Tarefa, comentario: str | None) -> T
              resumo=f"Devolveu {codigo(t)} para correcção", alteracoes={"estado": ["aguardar_aprovacao", "em_andamento"]}, ip=ctx.ip)
     notificar(db, t.responsavel_id, "tarefa_rejeitada", f"Correcções pedidas: {t.titulo}", comentario.strip(), ligacao(t),
               excepto=ctx.utilizador.id)
+    db.commit()
+    return t
+
+
+def responder_pedido(db: Session, ctx: Contexto, t: Tarefa, aceitar: bool, motivo: str | None) -> Tarefa:
+    """Melhoria nº 2: a colega aceita ou recusa o pedido. Recusado, a tarefa volta para quem pediu,
+    com o motivo, e a CEO é avisada para poder intervir."""
+    eu = ctx.utilizador
+    if t.pedido_estado != "pendente":
+        raise ErroNegocio("estado_invalido", "Este pedido já foi respondido.")
+    if t.responsavel_id != eu.id:
+        raise proibido("Só a colega a quem o pedido foi feito o pode aceitar ou recusar.")
+    motivo = (motivo or "").strip()
+    if not aceitar and not motivo:
+        raise ErroNegocio("motivo_obrigatorio", "Explique porque recusa o pedido (por exemplo, falta de tempo até ao prazo).")
+    t.pedido_decidido_em = agora()
+    t.versao += 1
+    if aceitar:
+        t.pedido_estado = "aceite"
+        if motivo:
+            _comentar(db, t, eu.id, motivo, "pedido")
+        notificar(db, t.criado_por_id, "pedido_tarefa", f"{eu.nome} aceitou: {t.titulo}",
+                  f"{codigo(t)} está agora com {eu.nome}, prazo {formatar_data(t.prazo)}.", ligacao(t))
+    else:
+        t.pedido_estado = "recusado"
+        t.responsavel_id = t.criado_por_id
+        _comentar(db, t, eu.id, f"Pedido recusado: {motivo}", "pedido")
+        notificar(db, t.criado_por_id, "pedido_tarefa", f"{eu.nome} recusou: {t.titulo}",
+                  f"Motivo: {motivo}. A tarefa voltou para si; fale com a CEO se precisar de outra pessoa.", ligacao(t))
+        notificar_ceo(db, "pedido_tarefa", f"Pedido recusado: {t.titulo}",
+                      f"{eu.nome} recusou o pedido de {t.criado_por.nome} ({codigo(t)}). Motivo: {motivo}", ligacao(t),
+                      excepto=t.criado_por_id)
+    registar(db, utilizador_id=eu.id, accao="aceitar_pedido" if aceitar else "recusar_pedido", entidade="tarefa", entidade_id=t.id,
+             resumo=f"{'Aceitou' if aceitar else 'Recusou'} o pedido {codigo(t)} «{t.titulo}»" + (f": {motivo}" if motivo else ""), ip=ctx.ip)
     db.commit()
     return t
 

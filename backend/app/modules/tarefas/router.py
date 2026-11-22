@@ -1,6 +1,9 @@
 from datetime import date
 from urllib.parse import quote
 from uuid import UUID
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from sqlalchemy import select
@@ -79,12 +82,13 @@ def listar(
     prazo_ate: date | None = None,
     atrasadas: bool = False,
     incluir_concluidas: bool = True,
+    pedidos: Literal["pendentes", "todos"] | None = None,
     ctx: Contexto = Depends(contexto_actual),
     db: Session = Depends(get_db),
 ):
     tarefas = service.listar(db, ctx, responsavel_id=responsavel_id, estados=estado, categoria_id=categoria_id,
                              prioridade=prioridade, pesquisa=pesquisa, prazo_de=prazo_de, prazo_ate=prazo_ate,
-                             apenas_atrasadas=atrasadas, incluir_concluidas=incluir_concluidas)
+                             apenas_atrasadas=atrasadas, incluir_concluidas=incluir_concluidas, pedidos=pedidos)
     com, anx = service.contagens(db, [t.id for t in tarefas])
     return [service.para_saida(ctx, t, com.get(t.id, 0), anx.get(t.id, 0)) for t in tarefas]
 
@@ -135,6 +139,18 @@ def confirmar_seguranca(tid: UUID, ctx: Contexto = Depends(contexto_actual), db:
         registar(db, utilizador_id=ctx.utilizador.id, accao="confirmar_seguranca", entidade="tarefa", entidade_id=t.id,
                  resumo=f"Confirmou a leitura das regras de segurança e higiene em {service.codigo(t)}", ip=ctx.ip)
         db.commit()
+    return service.saida_unica(db, ctx, t)
+
+
+class RespostaPedido(BaseModel):
+    aceitar: bool
+    motivo: str | None = Field(default=None, max_length=2000)
+
+
+@router.post("/{tid}/pedido", response_model=TarefaOut)
+def responder_pedido(tid: UUID, dados: RespostaPedido, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
+    """Melhoria nº 2: a colega aceita ou recusa uma tarefa pedida por outra colega."""
+    t = service.responder_pedido(db, ctx, service.obter(db, ctx, tid, bloquear=True), dados.aceitar, dados.motivo)
     return service.saida_unica(db, ctx, t)
 
 

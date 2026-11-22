@@ -88,12 +88,14 @@ export default function TarefaForm({ aberto, aoFechar, aoGuardar, tarefa, prazoI
         </div>
         <div>
           <label className="rotulo" htmlFor="t-resp">Responsável *</label>
-          <select id="t-resp" className="campo" value={f.responsavel_id} disabled={!delegar}
+          <select id="t-resp" className="campo" value={f.responsavel_id} disabled={!delegar && !!tarefa}
             onChange={(e) => mudar("responsavel_id", e.target.value)}>
-            {(delegar ? membros : membros.filter((m) => m.id === perfil!.id)).map((m) =>
+            {(delegar || !tarefa ? membros : membros.filter((m) => m.id === f.responsavel_id)).map((m) =>
               <option key={m.id} value={m.id}>{m.nome} — {ROTULO_FUNCAO[m.funcao]}</option>)}
           </select>
-          {!delegar && <p className="text-[11px] text-terra-700 mt-1">Só a CEO atribui tarefas a outras pessoas.</p>}
+          {!delegar && !tarefa && f.responsavel_id !== perfil!.id &&
+            <p className="text-[11px] text-aviso mt-1">Será um pedido: a colega aceita ou recusa, e a CEO vê todos os pedidos.</p>}
+          {!delegar && !!tarefa && <p className="text-[11px] text-terra-700 mt-1">Só a CEO reatribui tarefas.</p>}
         </div>
         <div>
           <label className="rotulo" htmlFor="t-cat">Categoria</label>

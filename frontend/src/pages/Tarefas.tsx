@@ -23,7 +23,7 @@ export default function Tarefas() {
     try { return (localStorage.getItem(CHAVE_VISTA) as Vista) || "kanban"; } catch { return "kanban"; }
   });
   const setVista = (v: Vista) => { setVistaEstado(v); try { localStorage.setItem(CHAVE_VISTA, v); } catch { /* ignorar */ } };
-  const [filtros, setFiltros] = useState({ responsavel_id: "", categoria_id: "", prioridade: "", pesquisa: "", atrasadas: false, ocultar_concluidas: false });
+  const [filtros, setFiltros] = useState({ responsavel_id: "", categoria_id: "", prioridade: "", pesquisa: "", atrasadas: false, ocultar_concluidas: false, pedidos: false });
   const [novo, setNovo] = useState<{ aberto: boolean; prazo?: string }>({ aberto: false });
   const aberta = params.get("abrir");
 
@@ -33,9 +33,9 @@ export default function Tarefas() {
     () => api.get<Tarefa[]>("/tarefas", {
       responsavel_id: filtros.responsavel_id, categoria_id: filtros.categoria_id, prioridade: filtros.prioridade,
       pesquisa: filtros.pesquisa.trim(), atrasadas: filtros.atrasadas || undefined,
-      incluir_concluidas: filtros.ocultar_concluidas ? false : undefined,
+      incluir_concluidas: filtros.ocultar_concluidas ? false : undefined, pedidos: filtros.pedidos ? "todos" : undefined,
     }),
-    [filtros.responsavel_id, filtros.categoria_id, filtros.prioridade, filtros.pesquisa, filtros.atrasadas, filtros.ocultar_concluidas],
+    [filtros.responsavel_id, filtros.categoria_id, filtros.prioridade, filtros.pesquisa, filtros.atrasadas, filtros.ocultar_concluidas, filtros.pedidos],
   );
   const tarefas = dados ?? [];
 
@@ -106,6 +106,8 @@ export default function Tarefas() {
             onChange={(e) => setFiltros({ ...filtros, atrasadas: e.target.checked })} />Só em atraso</label>
           <label className="flex items-center gap-2"><input type="checkbox" className="accent-folha-600" checked={filtros.ocultar_concluidas}
             onChange={(e) => setFiltros({ ...filtros, ocultar_concluidas: e.target.checked })} />Ocultar concluídas</label>
+          <label className="flex items-center gap-2"><input type="checkbox" className="accent-folha-600" checked={filtros.pedidos}
+            onChange={(e) => setFiltros({ ...filtros, pedidos: e.target.checked })} />Só pedidos entre colegas</label>
         </div>
       </div>
 
@@ -139,6 +141,7 @@ function Cartao({ t, aoAbrir, arrastavel }: { t: Tarefa; aoAbrir: (id: string) =
         <span className="truncate text-terra-700">{t.responsavel.nome}</span>
         <span className={t.em_atraso ? "text-alerta font-medium" : "text-terra-700"}>{fData(t.prazo)}</span>
       </div>
+      {t.pedido_estado === "pendente" && <p className="mt-2 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-aviso">Pedido de {t.criado_por.nome} — por responder</p>}
       {(t.n_comentarios > 0 || t.n_anexos > 0 || t.requer_aprovacao) && (
         <div className="mt-2 flex gap-3 text-[11px] text-terra-500">
           {t.n_comentarios > 0 && <span>💬 {t.n_comentarios}</span>}{t.n_anexos > 0 && <span>📎 {t.n_anexos}</span>}

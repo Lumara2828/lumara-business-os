@@ -58,6 +58,9 @@ class Tarefa(Base):
     procedimento_codigo: Mapped[str | None] = mapped_column(String(40))
     seguranca_confirmada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     seguranca_confirmada_por_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"))
+    # Melhoria nº 2: tarefa pedida por uma colega (não pela CEO) — a responsável aceita ou recusa.
+    pedido_estado: Mapped[str | None] = mapped_column(enum_texto("pendente", "aceite", "recusado", nome="estado_pedido_tarefa"), index=True)
+    pedido_decidido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     versao: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     criada_em: Mapped[datetime] = criado_em()
@@ -84,7 +87,7 @@ class ComentarioTarefa(Base):
     tarefa_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tarefas.id", ondelete="CASCADE"), nullable=False, index=True)
     autor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"), nullable=False)
     tipo: Mapped[str] = mapped_column(
-        enum_texto("comentario", "rejeicao", "submissao", "bloqueio", nome="tipo_comentario"),
+        enum_texto("comentario", "rejeicao", "submissao", "bloqueio", "pedido", nome="tipo_comentario"),
         nullable=False, default="comentario",
     )
     texto: Mapped[str] = mapped_column(Text, nullable=False)
