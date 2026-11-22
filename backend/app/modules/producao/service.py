@@ -69,6 +69,11 @@ def pode_operar(ctx: Contexto, o: OrdemProducao) -> bool:
 def iniciar(db: Session, ctx: Contexto, o: OrdemProducao) -> list[dict]:
     if o.estado != "planeada":
         raise ErroNegocio("estado_invalido", "Só é possível iniciar uma ordem planeada.")
+    if o.tarefa_id:
+        from app.modules.tarefas.instrucoes import verificar_transicao
+        t0 = db.get(Tarefa, o.tarefa_id)
+        if t0 is not None:
+            verificar_transicao(db, t0, "em_andamento")  # regras de segurança e higiene confirmadas na tarefa
     o.estado, o.iniciada_em = "em_curso", agora()
     faltas = [n for n in necessidades(db, o.ficha, o.quantidade_planeada) if n["falta"] > 0]
     registar(db, utilizador_id=ctx.utilizador.id, accao="iniciar", entidade="ordem_producao", entidade_id=o.id,
@@ -132,7 +137,9 @@ def concluir(db: Session, ctx: Contexto, o: OrdemProducao, quantidade_produzida:
                     f"lote {m.lote.numero}, validade {formatar_data(validade)}", ip=ctx.ip)
     if o.tarefa_id:
         t = db.get(Tarefa, o.tarefa_id)
-        if t and t.estado != "concluida" and not t.requer_aprovacao:
+        from app.modules.tarefas.instrucoes import pendencia
+        # Com checklist obrigatória por fazer, a tarefa fica aberta até a responsável a completar.
+        if t and t.estado != "concluida" and not t.requer_aprovacao and pendencia(db, t, "concluida") is None:
             t.estado, t.concluida_em, t.motivo_bloqueio = "concluida", agora(), None
             t.versao += 1
             registar(db, utilizador_id=ctx.utilizador.id, accao="mudar_estado", entidade="tarefa", entidade_id=t.id,

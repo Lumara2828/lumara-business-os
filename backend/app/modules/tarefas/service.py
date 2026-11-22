@@ -20,6 +20,7 @@ from app.core.tempo import agora, formatar_data, hoje
 from app.dependencies import Contexto
 from app.modules.equipa.models import Utilizador
 from app.modules.notificacoes.service import ids_ceo, notificar, notificar_ceo
+from app.modules.tarefas import instrucoes
 from app.modules.tarefas.models import AnexoTarefa, CategoriaTarefa, ComentarioTarefa, Tarefa
 from app.modules.tarefas.schemas import MudarEstado, Permissoes, TarefaActualizar, TarefaCriar, TarefaOut
 
@@ -82,7 +83,8 @@ def para_saida(ctx: Contexto, t: Tarefa, n_comentarios: int = 0, n_anexos: int =
         estado=t.estado, requer_aprovacao=t.requer_aprovacao, motivo_bloqueio=t.motivo_bloqueio,
         resultado_esperado=t.resultado_esperado, concluida_em=t.concluida_em, submetida_em=t.submetida_em,
         aprovada_em=t.aprovada_em, actividade_recorrente_id=t.actividade_recorrente_id,
-        procedimento_ref=t.actividade.procedimento_ref if t.actividade else None,
+        procedimento_ref=t.procedimento_codigo or (t.actividade.procedimento_ref if t.actividade else None),
+        procedimento_codigo=t.procedimento_codigo, seguranca_confirmada_em=t.seguranca_confirmada_em,
         em_atraso=em_atraso(t), dias_atraso=dias_atraso(t), concluida_no_prazo=concluida_no_prazo(t),
         n_comentarios=n_comentarios, n_anexos=n_anexos, versao=t.versao, is_demo=t.is_demo,
         permissoes=permissoes(ctx, t),
@@ -162,6 +164,18 @@ def _validar_responsavel(db: Session, responsavel_id) -> Utilizador:
     return u
 
 
+def _validar_procedimento(db: Session, codigo: str | None) -> str | None:
+    """Liga a tarefa a um procedimento aprovado (código POP); vazio desliga."""
+    from app.modules.procedimentos.router import aprovado_por_codigo
+    codigo = (codigo or "").strip()
+    if not codigo:
+        return None
+    p = aprovado_por_codigo(db, codigo)
+    if p is None:
+        raise ErroNegocio("procedimento_invalido", f"Não há um procedimento aprovado com o código «{codigo}».")
+    return p.codigo
+
+
 def _validar_categoria(db: Session, categoria_id) -> None:
     if categoria_id is not None:
         c = db.get(CategoriaTarefa, categoria_id)
@@ -180,6 +194,7 @@ def criar(db: Session, ctx: Contexto, dados: TarefaCriar) -> Tarefa:
         raise ErroNegocio("prazo_invalido", "O prazo não pode ser anterior a hoje.")
     responsavel = _validar_responsavel(db, responsavel_id)
     _validar_categoria(db, dados.categoria_id)
+    dados.procedimento_codigo = _validar_procedimento(db, dados.procedimento_codigo)
     t = Tarefa(**dados.model_dump(exclude={"responsavel_id"}), responsavel_id=responsavel_id, criado_por_id=eu.id)
     db.add(t)
     db.flush()
@@ -204,6 +219,8 @@ def actualizar(db: Session, ctx: Contexto, t: Tarefa, dados: TarefaActualizar) -
     alteracoes = dados.model_dump(exclude_unset=True, exclude={"versao"})
     if not alteracoes:
         return t
+    if "procedimento_codigo" in alteracoes:
+        alteracoes["procedimento_codigo"] = _validar_procedimento(db, alteracoes["procedimento_codigo"])
     if CAMPOS_SO_CEO & alteracoes.keys() and not p.reatribuir:
         raise proibido("Só a CEO pode reatribuir tarefas.")
     for obrig in ("titulo", "prazo", "prioridade", "requer_aprovacao", "responsavel_id"):
@@ -265,6 +282,7 @@ def mudar_estado(db: Session, ctx: Contexto, t: Tarefa, dados: MudarEstado) -> T
         raise ErroNegocio("motivo_obrigatorio", "Indique o motivo do bloqueio para que possa ser resolvido.")
     if antigo == "aguardar_aprovacao" and novo == "concluida" and ceo:
         return aprovar(db, ctx, t, comentario or None)
+    instrucoes.verificar_transicao(db, t, novo)
 
     momento = agora()
     t.estado = novo

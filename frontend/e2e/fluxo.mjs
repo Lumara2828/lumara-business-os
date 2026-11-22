@@ -122,6 +122,22 @@ await luisa.click("button[aria-label^='Notificações']");
 await luisa.waitForSelector("text=E2E: óleo de rícino");
 await foto(luisa, "13-notificacoes");
 
+// --- Melhoria nº 6: instruções passo a passo dentro da tarefa ---
+await diana.goto(`${BASE}/tarefas`);
+await diana.click("role=tab[name='Lista']");
+await diana.locator("text=Produzir 20 un.").first().click();
+await diana.waitForSelector("role=dialog >> text=Instruções passo a passo");
+await diana.waitForSelector("role=dialog >> text=Lotes a usar");
+await foto(diana, "32-instrucoes-na-tarefa");
+await diana.click("role=dialog >> button:has-text('Li e vou cumprir estas regras')");
+await diana.waitForSelector("role=dialog >> text=Leitura confirmada");
+for (const cb of await diana.locator("role=dialog >> section[aria-label='Instruções da tarefa'] input[type=checkbox]").all()) await cb.check();
+await diana.click("role=dialog >> button:has-text('Registar checklist')");
+await diana.waitForSelector("role=dialog >> text=completa ✓");
+await foto(diana, "33-checklist-na-tarefa");
+await diana.keyboard.press("Escape");
+// Sem a leitura confirmada a ordem não começaria; agora começa.
+
 // --- Fase 2: produção e stock ---
 await diana.goto(`${BASE}/producao`);
 await diana.waitForSelector("text=Ordens de produção");

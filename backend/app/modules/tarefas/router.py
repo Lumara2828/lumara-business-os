@@ -13,7 +13,8 @@ from app.core.errors import ErroNegocio, conflito, nao_encontrado, proibido
 from app.core.permissions import P
 from app.dependencies import Contexto, contexto_actual, requer
 from app.modules.auditoria.models import RegistoActividade
-from app.modules.tarefas import service
+from app.core.tempo import agora
+from app.modules.tarefas import instrucoes, service
 from app.modules.tarefas.models import AnexoTarefa, CategoriaTarefa, ComentarioTarefa
 from app.modules.tarefas.schemas import (
     AnexoOut, CategoriaIn, CategoriaOut, ComentarioIn, ComentarioOut, Decisao, MudarEstado, TarefaActualizar,
@@ -113,6 +114,27 @@ def eliminar(tid: UUID, ctx: Contexto = Depends(contexto_actual), db: Session = 
 @router.post("/{tid}/estado", response_model=TarefaOut)
 def mudar_estado(tid: UUID, dados: MudarEstado, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
     t = service.mudar_estado(db, ctx, service.obter(db, ctx, tid, bloquear=True), dados)
+    return service.saida_unica(db, ctx, t)
+
+
+@router.get("/{tid}/instrucoes")
+def ver_instrucoes(tid: UUID, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
+    """Melhoria nº 6: procedimento, regras de segurança e higiene e receita do lote, dentro da tarefa."""
+    t = service.obter(db, ctx, tid)
+    return instrucoes.instrucoes(db, t)
+
+
+@router.post("/{tid}/confirmar-seguranca", response_model=TarefaOut)
+def confirmar_seguranca(tid: UUID, ctx: Contexto = Depends(contexto_actual), db: Session = Depends(get_db)):
+    t = service.obter(db, ctx, tid, bloquear=True)
+    if ctx.utilizador.id != t.responsavel_id and not ctx.pode(P.TAREFAS_APROVAR):
+        raise proibido("Só a responsável pela tarefa confirma a leitura das regras.")
+    if t.seguranca_confirmada_em is None:
+        t.seguranca_confirmada_em, t.seguranca_confirmada_por_id = agora(), ctx.utilizador.id
+        t.versao += 1
+        registar(db, utilizador_id=ctx.utilizador.id, accao="confirmar_seguranca", entidade="tarefa", entidade_id=t.id,
+                 resumo=f"Confirmou a leitura das regras de segurança e higiene em {service.codigo(t)}", ip=ctx.ip)
+        db.commit()
     return service.saida_unica(db, ctx, t)
 
 

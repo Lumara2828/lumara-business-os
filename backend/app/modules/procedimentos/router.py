@@ -37,13 +37,17 @@ class ProcedimentoIn(BaseModel):
     etapas: list[str] = Field(min_length=1, max_length=60)
     checklist: list[str] = Field(default_factory=list, max_length=60)
     materiais: str | None = Field(default=None, max_length=3000)
+    seguranca_higiene: str | None = Field(default=None, max_length=5000)
+    checklist_obrigatoria: bool = False
+    regra_geral: bool = False
     notas_versao: str | None = Field(default=None, max_length=2000)
 
 
 def saida(p: Procedimento, db: Session | None = None) -> dict:
     s = {"id": p.id, "codigo": p.codigo, "versao": p.versao, "titulo": p.titulo, "area": p.area, "objectivo": p.objectivo,
          "funcao_responsavel": p.funcao_responsavel, "etapas": [e["descricao"] for e in p.etapas], "checklist": p.checklist,
-         "materiais": p.materiais, "estado": p.estado, "notas_versao": p.notas_versao, "criado_por": p.criado_por.nome,
+         "materiais": p.materiais, "seguranca_higiene": p.seguranca_higiene, "checklist_obrigatoria": p.checklist_obrigatoria,
+         "regra_geral": p.regra_geral, "estado": p.estado, "notas_versao": p.notas_versao, "criado_por": p.criado_por.nome,
          "aprovado_por": p.aprovado_por.nome if p.aprovado_por else None, "aprovado_em": p.aprovado_em, "is_demo": p.is_demo,
          "actualizado_em": p.actualizado_em}
     if db is not None:
@@ -95,6 +99,11 @@ def _aplicar(p: Procedimento, dados: ProcedimentoIn):
         setattr(p, k, v)
     p.etapas = [{"descricao": e.strip()} for e in dados.etapas if e.strip()]
     p.checklist = [c.strip() for c in dados.checklist if c.strip()]
+    p.seguranca_higiene = (dados.seguranca_higiene or "").strip() or None
+    if p.checklist_obrigatoria and not p.checklist:
+        raise ErroNegocio("checklist_em_falta", "Uma checklist obrigatória precisa de pelo menos um item.")
+    if p.regra_geral and not p.seguranca_higiene:
+        raise ErroNegocio("regras_em_falta", "Uma regra geral da área precisa do texto das regras de segurança e higiene.")
     if not p.etapas:
         raise ErroNegocio("etapas_em_falta", "Descreva pelo menos uma etapa.")
 
@@ -189,7 +198,8 @@ def nova_versao(pid: UUID, ctx: Contexto = Depends(requer(P.PROCEDIMENTOS_EDITAR
         raise conflito("Já existe uma versão em preparação deste procedimento.")
     n = Procedimento(codigo=p.codigo, versao=(db.scalar(select(func.max(Procedimento.versao)).where(Procedimento.codigo == p.codigo)) or 1) + 1,
                      titulo=p.titulo, area=p.area, objectivo=p.objectivo, funcao_responsavel=p.funcao_responsavel, etapas=list(p.etapas),
-                     checklist=list(p.checklist), materiais=p.materiais, estado="rascunho", criado_por_id=ctx.utilizador.id, is_demo=p.is_demo)
+                     checklist=list(p.checklist), materiais=p.materiais, seguranca_higiene=p.seguranca_higiene,
+                     checklist_obrigatoria=p.checklist_obrigatoria, regra_geral=p.regra_geral, estado="rascunho", criado_por_id=ctx.utilizador.id, is_demo=p.is_demo)
     db.add(n)
     db.flush()
     registar(db, utilizador_id=ctx.utilizador.id, accao="nova_versao", entidade="procedimento", entidade_id=n.id,

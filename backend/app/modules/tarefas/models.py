@@ -54,6 +54,10 @@ class Tarefa(Base):
         UUID(as_uuid=True), ForeignKey("actividades_recorrentes.id", ondelete="SET NULL")
     )
     data_referencia: Mapped[date | None] = mapped_column(Date)  # ocorrência da actividade recorrente
+    # Melhoria nº 6: procedimento (POP) ligado à tarefa e confirmação de leitura das regras de segurança.
+    procedimento_codigo: Mapped[str | None] = mapped_column(String(40))
+    seguranca_confirmada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    seguranca_confirmada_por_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"))
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     versao: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     criada_em: Mapped[datetime] = criado_em()
@@ -63,6 +67,7 @@ class Tarefa(Base):
     responsavel = relationship("Utilizador", foreign_keys=[responsavel_id], lazy="joined")
     criado_por = relationship("Utilizador", foreign_keys=[criado_por_id], lazy="joined")
     actividade = relationship("ActividadeRecorrente", lazy="joined")
+    seguranca_confirmada_por = relationship("Utilizador", foreign_keys=[seguranca_confirmada_por_id], lazy="joined")
 
     __table_args__ = (
         CheckConstraint("data_inicio IS NULL OR data_inicio <= prazo", name="tarefa_inicio_antes_prazo"),

@@ -18,8 +18,9 @@ export default function TarefaForm({ aberto, aoFechar, aoGuardar, tarefa, prazoI
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [f, setF] = useState({
     titulo: "", descricao: "", categoria_id: "", responsavel_id: "", data_inicio: "", prazo: "",
-    prioridade: "media" as Prioridade, requer_aprovacao: false, resultado_esperado: "",
+    prioridade: "media" as Prioridade, requer_aprovacao: false, resultado_esperado: "", procedimento_codigo: "",
   });
+  const [pops, setPops] = useState<{ codigo: string; titulo: string; estado: string }[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
 
@@ -27,14 +28,16 @@ export default function TarefaForm({ aberto, aoFechar, aoGuardar, tarefa, prazoI
     if (!aberto) return;
     api.get<UtilizadorResumo[]>("/equipa/membros").then(setMembros).catch(() => {});
     api.get<Categoria[]>("/tarefas/categorias").then((c) => setCategorias(c.filter((x) => x.activa))).catch(() => {});
+    api.get<{ codigo: string; titulo: string; estado: string }[]>("/procedimentos").then((p) => setPops(p.filter((x) => x.estado === "aprovado"))).catch(() => {});
     setErro(null);
     setF(tarefa ? {
       titulo: tarefa.titulo, descricao: tarefa.descricao ?? "", categoria_id: tarefa.categoria?.id ?? "",
       responsavel_id: tarefa.responsavel.id, data_inicio: tarefa.data_inicio ?? "", prazo: tarefa.prazo,
       prioridade: tarefa.prioridade, requer_aprovacao: tarefa.requer_aprovacao, resultado_esperado: tarefa.resultado_esperado ?? "",
+      procedimento_codigo: tarefa.procedimento_codigo ?? "",
     } : {
       titulo: "", descricao: "", categoria_id: "", responsavel_id: perfil!.id, data_inicio: "", prazo: prazoInicial ?? "",
-      prioridade: "media", requer_aprovacao: false, resultado_esperado: "",
+      prioridade: "media", requer_aprovacao: false, resultado_esperado: "", procedimento_codigo: "",
     });
   }, [aberto, tarefa, perfil, prazoInicial]);
 
@@ -51,6 +54,7 @@ export default function TarefaForm({ aberto, aoFechar, aoGuardar, tarefa, prazoI
       titulo: f.titulo.trim(), descricao: f.descricao.trim() || null, categoria_id: f.categoria_id || null,
       data_inicio: f.data_inicio || null, prazo: f.prazo, prioridade: f.prioridade, requer_aprovacao: f.requer_aprovacao,
       resultado_esperado: f.resultado_esperado.trim() || null,
+      procedimento_codigo: f.procedimento_codigo.trim() || null,
     };
     try {
       let t: Tarefa;
@@ -123,6 +127,14 @@ export default function TarefaForm({ aberto, aoFechar, aoGuardar, tarefa, prazoI
           <label className="rotulo" htmlFor="t-res">Resultado esperado (mensurável)</label>
           <input id="t-res" className="campo" placeholder="Ex.: 3 publicações feitas e agendadas" value={f.resultado_esperado}
             onChange={(e) => mudar("resultado_esperado", e.target.value)} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="rotulo" htmlFor="t-pop">Procedimento a seguir (opcional)</label>
+          <select id="t-pop" className="campo" value={f.procedimento_codigo} onChange={(e) => mudar("procedimento_codigo", e.target.value)}>
+            <option value="">Sem procedimento</option>
+            {pops.map((p) => <option key={p.codigo} value={p.codigo}>{p.codigo} — {p.titulo}</option>)}
+          </select>
+          <p className="text-xs text-terra-700 mt-1">As etapas, a checklist e as regras de segurança e higiene aparecem dentro da tarefa.</p>
         </div>
         {erro && <p className="sm:col-span-2 text-sm text-alerta" role="alert">{erro}</p>}
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">

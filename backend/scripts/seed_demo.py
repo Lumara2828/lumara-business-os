@@ -83,6 +83,12 @@ def limpar(db):
 def semear(db):
     garantir_base(db)
     if db.scalar(select(Utilizador).where(Utilizador.email == USERS[0][1], Utilizador.activo.is_(True))):
+        # Exemplos acrescentados em versões posteriores entram também numa base DEMO já existente.
+        diana = db.scalar(select(Utilizador).where(Utilizador.email == "diana@demo.lumara.ao"))
+        luisa = db.scalar(select(Utilizador).where(Utilizador.email == "luisa@demo.lumara.ao"))
+        if diana and luisa:
+            semear_instrucoes(db, diana, luisa)
+            db.commit()
         print("Os dados DEMO já existem. Use --limpar para os remover primeiro.")
         return
     u = {}
@@ -380,11 +386,55 @@ def semear_financas_procedimentos(db, maira, diana, luisa):
         db.add(Procedimento(codigo=cod, versao=1, titulo=f"[DEMO] {tit}", area=area, objectivo=obj, funcao_responsavel=func_,
                             etapas=[{"descricao": e} for e in etapas], checklist=check, estado="aprovado", criado_por_id=luisa.id,
                             aprovado_por_id=luisa.id, aprovado_em=agora(), is_demo=True))
+    semear_instrucoes(db, diana, luisa)
     cat = db.scalar(select(CategoriaFinanceira).where(CategoriaFinanceira.nome == "Embalagens e rótulos"))
     if cat:
         db.add(Lancamento(tipo="despesa", categoria_id=cat.id, descricao="[DEMO] Frascos âmbar de 30 ml (valor fictício)", valor_kz=D("10000"),
                           data_competencia=hoje(), estado="proposta", proposto_por_id=diana.id, is_demo=True,
                           justificacao="Stock abaixo do mínimo — valor fictício de demonstração."))
+    db.flush()
+
+
+def semear_instrucoes(db, diana, luisa):
+    """Melhoria nº 6 — exemplo DEMO de instruções na tarefa. Idempotente: também corre em bases DEMO já criadas."""
+    from app.core.tempo import agora
+    from app.modules.procedimentos.models import Procedimento
+    if db.scalar(select(Procedimento).where(Procedimento.codigo == "POP-PRD-01")):
+        return
+    # Melhoria nº 6 — exemplo de instruções dentro da tarefa (regras genéricas de demonstração, não as da Lumara).
+    db.add(Procedimento(codigo="POP-HIG-01", versao=1, titulo="[DEMO] Higiene e segurança na produção", area="qualidade",
+                        objectivo="Proteger quem produz e garantir produtos sem contaminação.", funcao_responsavel="producao",
+                        etapas=[{"descricao": "Ler estas regras antes de cada produção"}], checklist=[],
+                        seguranca_higiene="[DEMO] Lavar e desinfectar as mãos antes de começar.\nUsar touca, luvas e bata limpa.\n"
+                                          "Higienizar a bancada e os utensílios antes e depois.\nNão comer nem beber na área de produção.",
+                        regra_geral=True, estado="aprovado", criado_por_id=luisa.id, aprovado_por_id=luisa.id, aprovado_em=agora(), is_demo=True))
+    db.add(Procedimento(codigo="POP-PRD-01", versao=1, titulo="[DEMO] Produção de óleos em lote", area="producao",
+                        objectivo="Produzir cada lote de óleo com a receita exacta e qualidade constante.", funcao_responsavel="producao",
+                        materiais="Balança de precisão, copos graduados, funil, frascos e rótulos",
+                        etapas=[{"descricao": e} for e in ["Confirmar os lotes de matéria-prima indicados na tarefa",
+                                                            "Pesar cada ingrediente na quantidade indicada para o lote",
+                                                            "Misturar os óleos e juntar o óleo essencial no fim",
+                                                            "Envasar, fechar e rotular com o número do lote e a validade",
+                                                            "Registar a conclusão da ordem de produção no sistema"]],
+                        checklist=["Bancada e utensílios higienizados", "Pesagens conferidas", "Frascos bem vedados",
+                                   "Rótulos com lote e validade"],
+                        seguranca_higiene="[DEMO] Óleos essenciais: não tocar nos olhos; manter longe de fontes de calor.",
+                        checklist_obrigatoria=True, estado="aprovado", criado_por_id=luisa.id, aprovado_por_id=luisa.id,
+                        aprovado_em=agora(), is_demo=True))
+    from app.modules.producao.models import OrdemProducao
+    from app.modules.tarefas.models import CategoriaTarefa, Tarefa
+    o = db.scalar(select(OrdemProducao).where(OrdemProducao.is_demo.is_(True), OrdemProducao.estado == "planeada",
+                                              OrdemProducao.tarefa_id.is_(None)))
+    if o is not None:
+        cat = db.scalar(select(CategoriaTarefa).where(CategoriaTarefa.nome == "Produção"))
+        t = Tarefa(titulo=f"[DEMO] Produzir {o.quantidade_planeada.normalize():f} un. de {o.produto.nome.replace('[DEMO] ', '')}",
+                   descricao="Ordem de produção DEMO com instruções passo a passo.", categoria_id=cat.id if cat else None,
+                   responsavel_id=diana.id, criado_por_id=luisa.id, data_inicio=o.data_inicio, prazo=o.data_prevista,
+                   prioridade="alta", resultado_esperado="Lote produzido, rotulado e registado", procedimento_codigo="POP-PRD-01",
+                   is_demo=True)
+        db.add(t)
+        db.flush()
+        o.tarefa_id = t.id
     db.flush()
 
 

@@ -10,7 +10,7 @@ import { mensagemErro, useDados } from "../lib/useDados";
 
 const limpa = (s: string) => s.replace(/^\[DEMO\] /, "");
 interface Pop { id: string; codigo: string; versao: number; titulo: string; area: string; objectivo: string; funcao_responsavel: string; etapas: string[];
-  checklist: string[]; materiais: string | null; estado: string; notas_versao: string | null; criado_por: string; aprovado_por: string | null;
+  checklist: string[]; materiais: string | null; seguranca_higiene: string | null; checklist_obrigatoria: boolean; regra_geral: boolean; estado: string; notas_versao: string | null; criado_por: string; aprovado_por: string | null;
   aprovado_em: string | null; is_demo: boolean; execucoes?: number; historico_versoes?: { id: string; versao: number; estado: string; aprovado_em: string | null; notas_versao: string | null }[] }
 const EST: Record<string, [string, string]> = { rascunho: ["Rascunho", "bg-areia text-terra-700"], em_aprovacao: ["Em aprovação", "bg-amber-100 text-aviso"],
   aprovado: ["Aprovado", "bg-folha-100 text-folha-700"], obsoleto: ["Obsoleto", "bg-linho text-terra-700"] };
@@ -50,16 +50,17 @@ function FormPop({ pop, aoFechar, aoGuardar }: { pop?: Pop; aoFechar: () => void
   const toast = useToast();
   const [f, setF] = useState({ codigo: pop?.codigo ?? "", titulo: pop?.titulo ?? "", area: pop?.area ?? "producao", objectivo: pop?.objectivo ?? "",
     funcao_responsavel: pop?.funcao_responsavel ?? "producao", etapas: (pop?.etapas ?? [""]).join("\n"), checklist: (pop?.checklist ?? []).join("\n"),
-    materiais: pop?.materiais ?? "", notas_versao: pop?.notas_versao ?? "" });
+    materiais: pop?.materiais ?? "", notas_versao: pop?.notas_versao ?? "", seguranca_higiene: pop?.seguranca_higiene ?? "",
+    checklist_obrigatoria: pop?.checklist_obrigatoria ?? false, regra_geral: pop?.regra_geral ?? false });
   const [erro, setErro] = useState<string | null>(null);
   const submeter = async (e: FormEvent) => {
     e.preventDefault();
     const corpo = { ...f, etapas: f.etapas.split("\n").filter((x) => x.trim()), checklist: f.checklist.split("\n").filter((x) => x.trim()),
-      materiais: f.materiais || null, notas_versao: f.notas_versao || null };
+      materiais: f.materiais || null, notas_versao: f.notas_versao || null, seguranca_higiene: f.seguranca_higiene || null };
     try { const r = pop ? await api.put<Pop>(`/procedimentos/${pop.id}`, corpo) : await api.post<Pop>("/procedimentos", corpo); toast("Rascunho guardado."); aoGuardar(r.id); }
     catch (err) { setErro(mensagemErro(err)); }
   };
-  const m = (k: keyof typeof f, v: string) => setF({ ...f, [k]: v });
+  const m = (k: keyof typeof f, v: string | boolean) => setF({ ...f, [k]: v });
   return (
     <Modal aberto aoFechar={aoFechar} titulo={pop ? `Editar ${pop.codigo} v${pop.versao}` : "Novo procedimento"} largura="max-w-3xl">
       <form onSubmit={submeter} className="grid sm:grid-cols-2 gap-3" noValidate>
@@ -72,6 +73,11 @@ function FormPop({ pop, aoFechar, aoGuardar }: { pop?: Pop; aoFechar: () => void
         <div><label className="rotulo">Materiais / equipamento</label><input className="campo" value={f.materiais} onChange={(e) => m("materiais", e.target.value)} /></div>
         <div className="sm:col-span-2"><label className="rotulo" htmlFor="pop-et">Etapas * (uma por linha, pela ordem)</label><textarea id="pop-et" rows={6} className="campo" value={f.etapas} onChange={(e) => m("etapas", e.target.value)} /></div>
         <div className="sm:col-span-2"><label className="rotulo">Checklist de verificação (um item por linha)</label><textarea rows={4} className="campo" value={f.checklist} onChange={(e) => m("checklist", e.target.value)} /></div>
+        <label className="sm:col-span-2 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-folha-600" checked={f.checklist_obrigatoria} onChange={(e) => m("checklist_obrigatoria", e.target.checked)} />
+          <span><b>Checklist obrigatória</b> — a tarefa só se submete ou conclui com a checklist completa.</span></label>
+        <div className="sm:col-span-2"><label className="rotulo">Regras de segurança e higiene</label><textarea rows={4} className="campo" placeholder="Ex.: luvas e touca; bancada higienizada antes de começar…" value={f.seguranca_higiene} onChange={(e) => m("seguranca_higiene", e.target.value)} /></div>
+        <label className="sm:col-span-2 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-folha-600" checked={f.regra_geral} onChange={(e) => m("regra_geral", e.target.checked)} />
+          <span><b>Regra geral da área</b> — estas regras de segurança e higiene aparecem em todas as tarefas da área (ex.: higiene da produção).</span></label>
         <div className="sm:col-span-2"><label className="rotulo">Notas desta versão</label><input className="campo" value={f.notas_versao} onChange={(e) => m("notas_versao", e.target.value)} /></div>
         {erro && <p className="sm:col-span-2 text-sm text-alerta">{erro}</p>}
         <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" className="btn-secundario" onClick={aoFechar}>Cancelar</button><button className="btn-primario">Guardar rascunho</button></div>
@@ -100,6 +106,8 @@ function DetalhePop({ id, aoFechar, aoMudar, aoAbrir }: { id: string; aoFechar: 
           <span className="text-terra-700">{AREAS_POP[p.area]} · responsável: {ROTULO_FUNCAO[p.funcao_responsavel]}{p.aprovado_em ? ` · aprovado por ${p.aprovado_por} a ${fDataHora(p.aprovado_em)}` : ""}</span></div>
         <p><b>Objectivo:</b> {p.objectivo}</p>
         {p.materiais && <p><b>Materiais:</b> {p.materiais}</p>}
+        {p.seguranca_higiene && <div className="rounded-xl border border-aviso/40 bg-amber-50 p-3"><b>Segurança e higiene{p.regra_geral ? " (regra geral da área)" : ""}:</b><p className="whitespace-pre-wrap mt-1">{p.seguranca_higiene}</p></div>}
+        {p.checklist_obrigatoria && <p className="text-xs text-terra-700">Checklist obrigatória para concluir as tarefas ligadas a este procedimento.</p>}
         <div><h3 className="font-serif text-lg">Etapas</h3><ol className="list-decimal pl-5 space-y-1">{p.etapas.map((e, i) => <li key={i}>{e}</li>)}</ol></div>
         {p.checklist.length > 0 && <div><h3 className="font-serif text-lg">Checklist</h3><ul className="list-disc pl-5">{p.checklist.map((c, i) => <li key={i}>{c}</li>)}</ul></div>}
         <div className="flex flex-wrap gap-2 border-y border-linho py-3">

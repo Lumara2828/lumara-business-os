@@ -27,6 +27,12 @@ class Procedimento(Base):
     etapas: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)      # [{"descricao": "..."}]
     checklist: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)   # ["item", ...]
     materiais: Mapped[str | None] = mapped_column(Text)
+    # Melhoria nº 6: regras de segurança e higiene mostradas dentro das tarefas.
+    seguranca_higiene: Mapped[str | None] = mapped_column(Text)
+    # Se verdadeiro, a tarefa ligada só se conclui (ou submete) com a checklist completa.
+    checklist_obrigatoria: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Regra geral: as regras de segurança deste POP aparecem em todas as tarefas da área.
+    regra_geral: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     estado: Mapped[str] = mapped_column(enum_texto(*ESTADOS, nome="estado_procedimento"), nullable=False, default="rascunho", index=True)
     notas_versao: Mapped[str | None] = mapped_column(Text)
     criado_por_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilizadores.id"), nullable=False)

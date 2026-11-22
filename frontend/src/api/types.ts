@@ -16,6 +16,7 @@ export interface Tarefa {
   criada_em: string; actualizada_em: string; data_inicio: string | null; prazo: string;
   prioridade: Prioridade; estado: Estado; requer_aprovacao: boolean; motivo_bloqueio: string | null;
   resultado_esperado: string | null; concluida_em: string | null; submetida_em: string | null; aprovada_em: string | null;
+  procedimento_codigo?: string | null; seguranca_confirmada_em?: string | null;
   actividade_recorrente_id: string | null; procedimento_ref: string | null; em_atraso: boolean; dias_atraso: number; concluida_no_prazo: boolean | null;
   n_comentarios: number; n_anexos: number; versao: number; is_demo: boolean;
   permissoes: { editar: boolean; mudar_estado: boolean; aprovar: boolean; eliminar: boolean; reatribuir: boolean };

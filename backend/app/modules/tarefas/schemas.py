@@ -36,6 +36,7 @@ class TarefaCriar(BaseModel):
     prioridade: Prioridade = "media"
     requer_aprovacao: bool = False
     resultado_esperado: str | None = Field(default=None, max_length=1000)
+    procedimento_codigo: str | None = Field(default=None, max_length=40)
 
     @model_validator(mode="after")
     def _datas(self):
@@ -54,6 +55,7 @@ class TarefaActualizar(BaseModel):
     prioridade: Prioridade | None = None
     requer_aprovacao: bool | None = None
     resultado_esperado: str | None = Field(default=None, max_length=1000)
+    procedimento_codigo: str | None = Field(default=None, max_length=40)
     versao: int | None = Field(default=None, description="Versão lida; se indicada, evita sobrepor alterações de outra pessoa.")
 
 
@@ -122,6 +124,8 @@ class TarefaOut(BaseModel):
     aprovada_em: datetime | None
     actividade_recorrente_id: UUID | None
     procedimento_ref: str | None = None
+    procedimento_codigo: str | None = None
+    seguranca_confirmada_em: datetime | None = None
     em_atraso: bool
     dias_atraso: int
     concluida_no_prazo: bool | None
